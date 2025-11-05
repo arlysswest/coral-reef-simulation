@@ -11,74 +11,81 @@ use rand::Rng;
 use std::io;
 
 fn main() {
-    let mut coral: i32 = 35;
-    let mut algae: i32 = 10;
-    let mut temp: f32 = 27.0;
-    let mut ph: f32 = 8.1;
+    let coral: i32 = 35;
+    let algae: i32 = 10;
+    let temp: f32 = 27.0;
+    let ph: f32 = 8.1;
 
     println!("WELCOME TO THE CORAL REEF SIMULATION!\n");
 
-    let mut turn = 1;
-    let max_turns = 20;
-
-    loop {
-        println!("\n=== TURN {} ===", turn);
-
-        // (1) Display current stats
-        print_stats(coral, algae, temp, ph);
-
-        // (2) Ask user if they want to apply tool or quit
-        println!("\nWould you like to use a tool or quit?");
-        println!("0: Quit");
-        println!("1: Artificial substrates / 3D printed modules");
-        println!("2: Coral gardening");
-        println!("3: Micro-fragmentation");
-        println!("4: Removing pollution");
-
-        let mut choice = String::new();
-        io::stdin().read_line(&mut choice).expect("Failed to read");
-        let choice: u32 = match choice.trim().parse() {
-            Ok(n) => n,
-            Err(_) => { println!("Invalid input"); continue; }
-        };
-
-        // (3) Quit path
-        if choice == 0 {
-            println!("Simulation ended by user.");
-            break;
-        }
-
-        // (4) apply tool
-        apply_tool(choice, &mut coral, &mut algae, &mut ph);
-        println!("\nAFTER TOOL:");
-        print_stats(coral, algae, temp, ph);
-        println!("Great job! You helped the reef.");
-
-        // (5) random problem
-        let problem = rand::thread_rng().gen_range(1..=5);
-        println!("\nA problem has occurred!");
-        apply_problem(problem, &mut coral, &mut algae, &mut temp, &mut ph);
-
-        println!("\nAFTER PROBLEM:");
-        print_stats(coral, algae, temp, ph);
-
-        // (6) check end
-        if coral <= 0 {
-            println!("\nThe coral reef has collapsed. GAME OVER.");
-            break;
-        }
-        if algae >= 100 {
-            println!("\nThe reef is overrun by algae. GAME OVER.");
-            break;
-        }
-        if turn >= max_turns {
-            println!("\nMaximum turns reached. Simulation ended.");
-            break;
-        }
-
-        turn += 1;
-    }
+    simulate_turn(1, 20, coral, algae, temp, ph);
 }
+
+fn simulate_turn(
+    turn: u32,
+    max_turns: u32,
+    mut coral: i32,
+    mut algae: i32,
+    mut temp: f32,
+    mut ph: f32,
+) {
+    println!("\n=== TURN {} ===", turn);
+    print_stats(coral, algae, temp, ph);
+
+    println!("\nWould you like to use a tool or quit?");
+    println!("0: Quit");
+    println!("1: Artificial substrates / 3D printed modules");
+    println!("2: Coral gardening");
+    println!("3: Micro-fragmentation");
+    println!("4: Removing pollution");
+    println!("5: I want more information");
+
+    let mut choice = String::new();
+    io::stdin().read_line(&mut choice).expect("Failed to read");
+    let choice: u32 = match choice.trim().parse() {
+        Ok(n) => n,
+        Err(_) => { println!("Invalid input"); return simulate_turn(turn, max_turns, coral, algae, temp, ph); }
+    };
+
+    if choice == 0 {
+        println!("Simulation ended by user.");
+        return;
+    }
+
+    if choice == 5 {
+        more_info();
+        return simulate_turn(turn, max_turns, coral, algae, temp, ph);
+    }
+
+    apply_tool(choice, &mut coral, &mut algae, &mut ph);
+    println!("\nAFTER TOOL:");
+    print_stats(coral, algae, temp, ph);
+    println!("Great job! You helped the reef.");
+
+    let problem = rand::thread_rng().gen_range(1..=5);
+    println!("\nA problem has occurred!");
+    apply_problem(problem, &mut coral, &mut algae, &mut temp, &mut ph);
+
+    println!("\nAFTER PROBLEM:");
+    print_stats(coral, algae, temp, ph);
+
+    if coral <= 0 {
+        println!("\nThe coral reef has collapsed. GAME OVER.");
+        return;
+    }
+    if algae >= 100 {
+        println!("\nThe reef is overrun by algae. GAME OVER.");
+        return;
+    }
+    if turn >= max_turns {
+        println!("\nMaximum turns reached. Simulation ended.");
+        return;
+    }
+
+    // *** THE RECURSION ***
+    simulate_turn(turn + 1, max_turns, coral, algae, temp, ph);
+}
+
 
 fn print_stats(coral: i32, algae: i32, temp: f32, ph: f32) {
     println!(" Coral cover: {}%", coral);
@@ -110,4 +117,81 @@ fn apply_problem(problem: u32, coral: &mut i32, algae: &mut i32, temp: &mut f32,
     }
     if *coral < 0 { *coral = 0; }
     if *algae > 100 { *algae = 100; }
+}
+
+fn more_info() {
+    loop {
+        println!("Do you want more information about a problem or a tool?");
+        println!("1: I want more information about a problem");
+        println!("2: I want more information about a tool");
+        println!("3: What statistics should the reef have");
+
+        let mut option = String::new();
+        io::stdin().read_line(&mut option).expect("Failed to read");
+
+        let option: u32 = match option.trim().parse() {
+            Ok(n) => n,
+            Err(_) => {
+                println!("Invalid input, please enter 1, 2 or 3.\n");
+                continue;
+            }
+        };
+
+        match option {
+            1 => {
+                println!("POLLUTION:");
+                println!("WHAT THIS DOES TO THE CORAL REEF: <fill this in>");
+                println!("AFFECTS ON STATISTICS: Coral cover: -5%, algea cover: +5%, ph: -0.05, temperature = no change/n");
+                
+                println!("INVASIVE SPECIES:");
+                println!("WHAT THIS DOES TO THE CORAL REEF: <fill this in>");
+                println!("AFFECTS ON STATISTICS: Coral cover: -5%, algea cover: +4%, ph = no change, temperature = no change/n");
+                
+                println!("CO2 EMISSIONS RISING:");
+                println!("WHAT THIS DOES TO THE CORAL REEF <fill this in>");
+                println!("AFFECTS ON STATISTICS: <fill this in");
+                
+                println!("PHYSICAL DAMAGE FROM STORM:");
+                println!("WHAT THIS DOES TO THE CORAL REEF <fill this in>");
+                println!("AFFECTS ON STATISTICS: <fill this in");
+
+                println!("OVERFISHING:");
+                println!("WHAT THIS DOES TO THE CORAL REEF <fill this in>");
+                println!("AFFECTS ON STATISTICS: <fill this in");
+            }
+            2 => {
+                println!("ARTICIFIAL SUBSTRATES/3D PRINTED MODEL:");
+                println!("WHAT THIS IS: <fill this in>");
+                println!("HOW THIS HELPS THE REEF: <fill this in>");
+                println!("AFFECTS ON STATISTICS: <fill this in>/n");
+
+                println!("CORAL GARDENING:");
+                println!("WHAT THIS IS: <fill this in>");
+                println!("HOW THIS HELPS THE REEF: <fill this in>");
+                println!("AFFECTS ON STATISTICS: <fill this in>/n");
+
+                println!("MICRO-FRAGMENTATION:");
+                println!("WHAT THIS IS: <fill this in>");
+                println!("HOW THIS HELPS THE REEF: <fill this in>");
+                println!("AFFECTS ON STATISTICS: <fill this in>/n");
+
+                println!("REMOVING POLUTION");
+                println!("WHAT THIS IS: <fill this in>");
+                println!("HOW THIS HELPS THE REEF: <fill this in>");
+                println!("AFFECTS ON STATISTICS: <fill this in>/n");
+            }
+            3 => {
+                println!("UNHEALTHY REEF:");
+                println!(" < fill these statistics in>");
+                println!("HEALTHY REEF:");
+                println!(" <fill these statistics in>")
+            }
+            _ => {
+                println!("Invalid input, please enter 1, 2 or 3.\n");
+                continue;
+            }
+        }
+
+        break; // stop looping after we printed the correct section
+    }
 }
