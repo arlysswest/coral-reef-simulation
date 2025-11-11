@@ -139,59 +139,85 @@ fn more_info() {
 
         match option {
             1 => {
+                println!("\n--- PROBLEMS ---");
+
                 println!("POLLUTION:");
-                println!("WHAT THIS DOES TO THE CORAL REEF: <fill this in>");
+                println!("WHAT THIS DOES TO THE CORAL REEF: Pollution from runoff, plastics, and chemicals clouds the water and blocks sunlight, reduces oxygen, and poisons coral organisms. It also encourages algae growth that competes with coral.");
                 println!("AFFECTS ON STATISTICS: Coral cover: -5%, algea cover: +5%, ph: -0.05, temperature = no change/n");
                 
                 println!("INVASIVE SPECIES:");
-                println!("WHAT THIS DOES TO THE CORAL REEF: <fill this in>");
+                println!("WHAT THIS DOES TO THE CORAL REEF: Non-native species, like crown-of-thorns starfish or lionfish, eat coral or outcompete local fish that keep algae in check, destabilizing the reef ecosystem.");
                 println!("AFFECTS ON STATISTICS: Coral cover: -5%, algea cover: +4%, ph = no change, temperature = no change/n");
                 
                 println!("CO2 EMISSIONS RISING:");
-                println!("WHAT THIS DOES TO THE CORAL REEF <fill this in>");
-                println!("AFFECTS ON STATISTICS: <fill this in");
+                println!("WHAT THIS DOES TO THE CORAL REEF: Rising CO2 causes ocean acidification (lowering pH) and warmer waters, leading to coral bleaching and slower skeleton growth.");
+                println!("AFFECTS ON STATISTICS: Coral cover: -3%, Algae cover: +3%, pH: -0.03, Temperature: +1.0°C\n");
                 
                 println!("PHYSICAL DAMAGE FROM STORM:");
-                println!("WHAT THIS DOES TO THE CORAL REEF <fill this in>");
-                println!("AFFECTS ON STATISTICS: <fill this in");
+                println!("WHAT THIS DOES TO THE CORAL REEF: Strong waves from storms break coral structures and scatter fragments. Recovery takes years without restoration help.");
+                println!("AFFECTS ON STATISTICS: Coral cover: -6%, Algae cover: +2%, pH: no change, Temperature: no change\n ");
 
                 println!("OVERFISHING:");
-                println!("WHAT THIS DOES TO THE CORAL REEF <fill this in>");
-                println!("AFFECTS ON STATISTICS: <fill this in");
+                println!("WHAT THIS DOES TO THE CORAL REEF: Removing too many fish—especially herbivores—causes algae to grow unchecked, reducing coral health and biodiversity.");
+                println!("AFFECTS ON STATISTICS: Coral cover: -4%, Algae cover: +3%, pH: no change, Temperature: no change\n");
             }
             2 => {
+                println!("\n--- TOOLS / RESTORATION METHODS ---");
+
                 println!("ARTICIFIAL SUBSTRATES/3D PRINTED MODEL:");
-                println!("WHAT THIS IS: <fill this in>");
-                println!("HOW THIS HELPS THE REEF: <fill this in>");
-                println!("AFFECTS ON STATISTICS: <fill this in>/n");
+                println!("WHAT THIS IS: Man-made reef structures designed to provide stable surfaces for coral larvae to attach to and grow on.");
+                println!("HOW THIS HELPS THE REEF: Replaces lost habitat and encourages new coral growth by giving larvae safe, suitable surfaces. ");
+                println!("AFFECTS ON STATISTICS: Coral cover: +5%, Algae cover: no change, pH: no change\n/n");
 
                 println!("CORAL GARDENING:");
-                println!("WHAT THIS IS: <fill this in>");
-                println!("HOW THIS HELPS THE REEF: <fill this in>");
-                println!("AFFECTS ON STATISTICS: <fill this in>/n");
+                println!("WHAT THIS IS: Growing coral fragments in underwater nurseries and replanting them onto damaged reefs.");
+                println!("HOW THIS HELPS THE REEF: Boosts coral recovery and biodiversity by restoring live coral cover faster.");
+                println!("AFFECTS ON STATISTICS: Coral cover: +4%, Algae cover: -2%, pH: no change\n");
 
                 println!("MICRO-FRAGMENTATION:");
-                println!("WHAT THIS IS: <fill this in>");
-                println!("HOW THIS HELPS THE REEF: <fill this in>");
-                println!("AFFECTS ON STATISTICS: <fill this in>/n");
+                println!("WHAT THIS IS: Cutting coral into small fragments to speed up their healing and growth once reattached to the reef.");
+                println!("HOW THIS HELPS THE REEF: Rapidly increases coral cover and allows corals to fuse together, forming larger colonies faster.");
+                println!("AFFECTS ON STATISTICS: Coral cover: +6%, Algae cover: -3%, pH: no change\n");
+
 
                 println!("REMOVING POLUTION");
-                println!("WHAT THIS IS: <fill this in>");
-                println!("HOW THIS HELPS THE REEF: <fill this in>");
-                println!("AFFECTS ON STATISTICS: <fill this in>/n");
+                println!("WHAT THIS IS: Physically cleaning debris and reducing pollutants in the reef area.");
+                println!("HOW THIS HELPS THE REEF: Improves water quality, increases light penetration, and helps coral recover.");
+                println!("AFFECTS ON STATISTICS: Coral cover: +3%, Algae cover: -3%, pH: +0.05\n");
             }
             3 => {
+                println!("\n--- REEF STATISTICS ---");
+
                 println!("UNHEALTHY REEF:");
-                println!(" < fill these statistics in>");
+                println!(" Coral cover: below 20%");
+                println!(" Algae cover: above 60%");
+                println!(" pH: below 7.8");
+                println!(" Temperature: above 30°C");
+                println!(" Condition: Reef struggling, low biodiversity, frequent bleaching events.\n");
+
                 println!("HEALTHY REEF:");
-                println!(" <fill these statistics in>")
+                println!(" Coral cover: 40–60%");
+                println!(" Algae cover: 10–25%");
+                println!(" pH: 8.0–8.2");
+                println!(" Temperature: 26–28°C");
+                println!(" Condition: Balanced ecosystem with strong coral growth and fish diversity.\n");
+
+                println!("GAME OVER:");
+                println!(" Coral cover: 0%");
+                println!(" Algae cover: 100%");
+                println!(" pH: below 7.7");
+                println!(" Temperature: above 32°C");
+                println!(" Condition: Coral death, ecosystem collapse, no recovery possible without intervention.\n");
+                
             }
             _ => {
                 println!("Invalid input, please enter 1, 2 or 3.\n");
                 continue;
             }
+            break; //exit the loop
         }
 
-        break; // stop looping after we printed the correct section
+        
+
     }
 }
