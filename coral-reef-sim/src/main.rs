@@ -1,11 +1,9 @@
-//PROGRAM IS CURRENTLY MEETING BASIC EXPECTATIONS
+//CURRENT PROGRESS ON VISUAL VERSION
 
 //WAYS IT COULD BE IMPROVED
 // 1. make a visual version
 // 2. add a map function in the visual version
 // 3. need to add additional documentation
-
-//FINISHED TEXT-BASED VERSION
 
 use rand::Rng;
 use std::{io, thread, time::Duration};
