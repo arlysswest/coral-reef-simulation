@@ -3,12 +3,12 @@
 //WAYS IT COULD BE IMPROVED
 // 1. make a visual version
 // 2. add a map function in the visual version
-// 3. add a more info option to explain why things are occuring and what the tools are
-// 4. add pauses so that less text comes out at once making it more digestable
-// 5. need to add additional documentation
+// 3. need to add additional documentation
+
+//FINISHED TEXT-BASED VERSION
 
 use rand::Rng;
-use std::io;
+use std::{io, thread, time::Duration};
 
 fn main() {
     let coral: i32 = 35;
@@ -62,12 +62,18 @@ fn simulate_turn(
     print_stats(coral, algae, temp, ph);
     println!("Great job! You helped the reef.");
 
+    // short pause before next event
+    thread::sleep(Duration::from_secs(2));
+
     let problem = rand::thread_rng().gen_range(1..=5);
     println!("\nA problem has occurred!");
     apply_problem(problem, &mut coral, &mut algae, &mut temp, &mut ph);
 
     println!("\nAFTER PROBLEM:");
     print_stats(coral, algae, temp, ph);
+
+    // another pause to let player read results
+    thread::sleep(Duration::from_secs(3));
 
     if coral <= 0 {
         println!("\nThe coral reef has collapsed. GAME OVER.");
@@ -81,6 +87,10 @@ fn simulate_turn(
         println!("\nMaximum turns reached. Simulation ended.");
         return;
     }
+
+    println!("\nPress ENTER to continue to the next turn...");
+    let mut _wait = String::new();
+    io::stdin().read_line(&mut _wait).unwrap();
 
     // *** THE RECURSION ***
     simulate_turn(turn + 1, max_turns, coral, algae, temp, ph);
@@ -214,8 +224,9 @@ fn more_info() {
                 println!("Invalid input, please enter 1, 2 or 3.\n");
                 continue;
             }
-            break; //exit the loop
+           
         }
+        break;//exit the loop
 
         
 
