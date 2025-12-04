@@ -1,17 +1,16 @@
-//CURRENT PROGRESS ON VISUAL VERSION
-
 use bevy::prelude::*;
+use rand::Rng;
 use std::time::Duration;
-use std::io;
+
+// === Resources ===
 
 #[derive(Resource)]
 struct ProblemTimer(Timer);
 
 #[derive(Resource)]
 struct GameState {
-    score: i32,
     turn: u32,
-    message: String,
+    message: String, // ONLY messages here (no stats)
 }
 
 #[derive(Resource)]
@@ -22,14 +21,38 @@ struct ReefStats {
     temp: f32,
 }
 
-// Marker components for UI text
+// === UI Markers ===
+
 #[derive(Component)]
 struct StatsText;
 
 #[derive(Component)]
 struct MessageText;
 
-//Main Logic
+#[derive(Component)]
+struct MapPanel;
+
+#[derive(Component)]
+struct ReefView;
+
+#[derive(Clone, Copy)]
+enum ToolKind {
+    ArtificialSubstrates,
+    CoralGardening,
+    MicroFragmentation,
+    RemovingPollution,
+}
+
+#[derive(Component)]
+struct ToolButton {
+    kind: ToolKind,
+}
+
+#[derive(Component)]
+struct QuitButton;
+
+// === MAIN ===
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -40,128 +63,406 @@ fn main() {
             }),
             ..default()
         }))
-        .insert_resource(ProblemTimer(Timer::from_seconds(3.0, TimerMode::Repeating)))
+        .insert_resource(ProblemTimer(Timer::new(
+            Duration::from_secs(5),
+            TimerMode::Repeating,
+        )))
         .insert_resource(GameState {
-            score: 0,
             turn: 0,
-            message: "Welcome to Coral Reef Sim!".to_string(),
+            message: "Welcome! Use tools to restore the reef.".to_string(),
         })
         .insert_resource(ReefStats {
-            coral: 10,
-            algae: 5,
+            coral: 35,
+            algae: 10,
             ph: 8.1,
-            temp: 27.5,
+            temp: 27.0,
         })
         .add_systems(Startup, setup_ui)
-        .add_systems(Update, (button_system, problem_timer_system, update_stats_ui_system))
+        .add_systems(
+            Update,
+            (
+                quit_button_system,
+                tool_button_system,
+                problem_timer_system,
+                update_stats_ui_system,
+            ),
+        )
         .run();
 }
 
-// UI setup
-fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
+// === UI SETUP ===
+
+fn setup_ui(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
+    // Root vertical layout
     commands
         .spawn(NodeBundle {
             style: Style {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgb(0.1, 0.2, 0.5)),
+            background_color: BackgroundColor(Color::srgb(0.0, 0.1, 0.25)),
             ..default()
         })
-        .with_children(|parent| {
-            // Start Button
-            parent
-                .spawn((
+        .with_children(|root| {
+            // === Top Bar (Quit button) ===
+            root.spawn(NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(40.0),
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::FlexStart,
+                    align_items: AlignItems::Center,
+                    padding: UiRect::all(Val::Px(6.0)),
+                    ..default()
+                },
+                background_color: BackgroundColor(Color::srgb(0.05, 0.05, 0.1)),
+                ..default()
+            })
+            .with_children(|bar| {
+                bar.spawn((
                     ButtonBundle {
                         style: Style {
-                            width: Val::Px(200.),
-                            height: Val::Px(60.),
+                            width: Val::Px(60.0),
+                            height: Val::Px(28.0),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
-                            margin: UiRect::all(Val::Px(10.)),
+                            margin: UiRect::right(Val::Px(10.0)),
                             ..default()
                         },
-                        background_color: BackgroundColor(Color::srgb(0.9, 0.8, 0.2)),
+                        background_color: BackgroundColor(Color::srgb(0.8, 0.3, 0.3)),
                         ..default()
                     },
-                    Name::new("StartButton"),
+                    QuitButton,
                 ))
-                .with_children(|button| {
-                    button.spawn(TextBundle::from_section(
-                        "Start",
+                .with_children(|btn| {
+                    btn.spawn(TextBundle::from_section(
+                        "Quit",
                         TextStyle {
                             font: Default::default(),
-                            font_size: 36.0,
-                            color: Color::BLACK,
+                            font_size: 18.0,
+                            color: Color::WHITE,
                         },
                     ));
                 });
+            });
 
-            // Stats Text
-            parent.spawn((
-                TextBundle::from_section(
-                    "Stats: Coral = 10, Algae = 5, pH = 8.1, Temp = 27.5°C",
-                    TextStyle {
-                        font: Default::default(),
-                        font_size: 36.0,
-                        color: Color::WHITE,
-                    },
-                )
-                .with_style(Style {
-                    margin: UiRect::all(Val::Px(10.)),
+            // === Main Content (reef + sidebar) ===
+            root.spawn(NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(80.0),
+                    flex_direction: FlexDirection::Row,
                     ..default()
-                }),
-                StatsText,
-            ));
+                },
+                ..default()
+            })
+            .with_children(|main_row| {
+                // LEFT — Reef View
+                main_row
+                    .spawn((
+                        NodeBundle {
+                            style: Style {
+                                flex_grow: 3.0,
+                                margin: UiRect::all(Val::Px(8.0)),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            background_color: BackgroundColor(Color::srgb(0.1, 0.25, 0.5)),
+                            ..default()
+                        },
+                        ReefView,
+                    ))
+                    .with_children(|reef| {
+                        reef.spawn(TextBundle::from_section(
+                            "Reef View (visuals coming soon)",
+                            TextStyle {
+                                font: Default::default(),
+                                font_size: 22.0,
+                                color: Color::WHITE,
+                            },
+                        ));
+                    });
 
-            // Message Text
-            parent.spawn((
-                TextBundle::from_section(
-                    "Welcome to Coral Reef Sim!",
-                    TextStyle {
-                        font: Default::default(),
-                        font_size: 20.0,
-                        color: Color::WHITE,
-                    },
-                )
-                .with_style(Style {
-                    margin: UiRect::all(Val::Px(5.)),
+                // RIGHT — Sidebar
+                main_row
+                    .spawn(NodeBundle {
+                        style: Style {
+                            flex_grow: 1.0,
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(8.0),
+                            margin: UiRect::all(Val::Px(8.0)),
+                            ..default()
+                        },
+                        ..default()
+                    })
+                    .with_children(|sidebar| {
+                        // === MAP (TOP RIGHT) ===
+                        sidebar
+                            .spawn((
+                                NodeBundle {
+                                    style: Style {
+                                        height: Val::Percent(25.0),
+                                        padding: UiRect::all(Val::Px(8.0)),
+                                        flex_direction: FlexDirection::Column,
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        ..default()
+                                    },
+                                    background_color: BackgroundColor(Color::srgb(
+                                        0.05, 0.2, 0.25,
+                                    )),
+                                    ..default()
+                                },
+                                MapPanel,
+                            ))
+                            .with_children(|map| {
+                                map.spawn(TextBundle::from_section(
+                                    "Map (Future Feature)",
+                                    TextStyle {
+                                        font: Default::default(),
+                                        font_size: 18.0,
+                                        color: Color::WHITE,
+                                    },
+                                ));
+                            });
+
+                        // === MESSAGES (Under Map) ===
+                        sidebar
+                            .spawn(NodeBundle {
+                                style: Style {
+                                    height: Val::Percent(30.0),
+                                    padding: UiRect::all(Val::Px(8.0)),
+                                    flex_direction: FlexDirection::Column,
+                                    ..default()
+                                },
+                                background_color: BackgroundColor(Color::srgb(
+                                    0.05, 0.15, 0.35,
+                                )),
+                                ..default()
+                            })
+                            .with_children(|msg_panel| {
+                                msg_panel.spawn(TextBundle::from_section(
+                                    "Messages",
+                                    TextStyle {
+                                        font: Default::default(),
+                                        font_size: 22.0,
+                                        color: Color::srgb(0.8, 0.9, 1.0),
+                                    },
+                                ));
+
+                                msg_panel.spawn((
+                                    TextBundle::from_section(
+                                        "Welcome! Use tools to improve the reef.",
+                                        TextStyle {
+                                            font: Default::default(),
+                                            font_size: 18.0,
+                                            color: Color::WHITE,
+                                        },
+                                    )
+                                    .with_style(Style {
+                                        margin: UiRect::top(Val::Px(6.0)),
+                                        ..default()
+                                    }),
+                                    MessageText,
+                                ));
+                            });
+
+                        // === TOOLS (Bottom right) ===
+                        sidebar
+                            .spawn(NodeBundle {
+                                style: Style {
+                                    height: Val::Percent(45.0),
+                                    padding: UiRect::all(Val::Px(8.0)),
+                                    flex_direction: FlexDirection::Column,
+                                    row_gap: Val::Px(6.0),
+                                    ..default()
+                                },
+                                background_color: BackgroundColor(Color::srgb(
+                                    0.06, 0.18, 0.28,
+                                )),
+                                ..default()
+                            })
+                            .with_children(|tools| {
+                                tools.spawn(TextBundle::from_section(
+                                    "Tools",
+                                    TextStyle {
+                                        font: Default::default(),
+                                        font_size: 22.0,
+                                        color: Color::srgb(0.8, 0.9, 1.0),
+                                    },
+                                ));
+
+                                let spawn_tool = |label: &str,
+                                                  kind: ToolKind,
+                                                  parent: &mut ChildBuilder| {
+                                    parent
+                                        .spawn((
+                                            ButtonBundle {
+                                                style: Style {
+                                                    height: Val::Px(32.0),
+                                                    width: Val::Percent(100.0),
+                                                    justify_content: JustifyContent::Center,
+                                                    align_items: AlignItems::Center,
+                                                    ..default()
+                                                },
+                                                background_color: BackgroundColor(Color::srgb(
+                                                    0.9, 0.8, 0.3,
+                                                )),
+                                                ..default()
+                                            },
+                                            ToolButton { kind },
+                                        ))
+                                        .with_children(|b| {
+                                            b.spawn(TextBundle::from_section(
+                                                label,
+                                                TextStyle {
+                                                    font: Default::default(),
+                                                    font_size: 16.0,
+                                                    color: Color::BLACK,
+                                                },
+                                            ));
+                                        });
+                                };
+
+                                spawn_tool(
+                                    "Artificial substrates / 3D modules",
+                                    ToolKind::ArtificialSubstrates,
+                                    tools,
+                                );
+                                spawn_tool(
+                                    "Coral gardening",
+                                    ToolKind::CoralGardening,
+                                    tools,
+                                );
+                                spawn_tool(
+                                    "Micro-fragmentation",
+                                    ToolKind::MicroFragmentation,
+                                    tools,
+                                );
+                                spawn_tool(
+                                    "Removing pollution",
+                                    ToolKind::RemovingPollution,
+                                    tools,
+                                );
+                            });
+                    });
+            });
+
+            // === Bottom Stats Bar ===
+            root.spawn(NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(10.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    padding: UiRect::all(Val::Px(8.0)),
                     ..default()
-                }),
-                MessageText,
-            ));
+                },
+                background_color: BackgroundColor(Color::srgb(0.02, 0.05, 0.12)),
+                ..default()
+            })
+            .with_children(|stats_row| {
+                stats_row.spawn((
+                    TextBundle::from_section(
+                        "Stats loading...",
+                        TextStyle {
+                            font: Default::default(),
+                            font_size: 20.0,
+                            color: Color::WHITE,
+                        },
+                    ),
+                    StatsText,
+                ));
+            });
         });
 }
 
-//Button logic
-fn button_system(
-    mut interaction_query: Query<(&Interaction, &mut BackgroundColor), (Changed<Interaction>, With<Button>)>,
-    mut state: ResMut<GameState>,
+// === QUIT BUTTON SYSTEM ===
+
+fn quit_button_system(
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<QuitButton>),
+    >,
+    mut app_exit_events: EventWriter<AppExit>,
 ) {
     for (interaction, mut color) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
-                state.score += 1;
-                state.message = format!("You helped the reef! Score = {}", state.score);
-                *color = BackgroundColor(Color::srgb(0.2, 0.8, 0.2));
+                *color = BackgroundColor(Color::srgb(0.6, 0.2, 0.2));
+                app_exit_events.send(AppExit::Success);
             }
             Interaction::Hovered => {
-                *color = BackgroundColor(Color::srgb(0.9, 0.9, 0.5));
+                *color = BackgroundColor(Color::srgb(0.9, 0.4, 0.4));
             }
             Interaction::None => {
-                *color = BackgroundColor(Color::srgb(0.9, 0.8, 0.2));
+                *color = BackgroundColor(Color::srgb(0.8, 0.3, 0.3));
             }
         }
     }
 }
 
-// Problem timer system
+// === TOOL BUTTONS ===
+
+fn tool_button_system(
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor, &ToolButton),
+        (Changed<Interaction>, With<Button>),
+    >,
+    mut stats: ResMut<ReefStats>,
+    mut state: ResMut<GameState>,
+) {
+    for (interaction, mut color, tool_button) in &mut interaction_query {
+        match *interaction {
+            Interaction::Pressed => {
+                apply_tool(tool_button.kind, &mut stats, &mut state);
+                *color = BackgroundColor(Color::srgb(0.3, 0.9, 0.4));
+            }
+            Interaction::Hovered => {
+                *color = BackgroundColor(Color::srgb(0.95, 0.9, 0.6));
+            }
+            Interaction::None => {
+                *color = BackgroundColor(Color::srgb(0.9, 0.8, 0.3));
+            }
+        }
+    }
+}
+
+fn apply_tool(kind: ToolKind, stats: &mut ReefStats, state: &mut GameState) {
+    let msg = match kind {
+        ToolKind::ArtificialSubstrates => {
+            stats.coral += 5;
+            "Applied artificial substrates!"
+        }
+        ToolKind::CoralGardening => {
+            stats.coral += 4;
+            stats.algae -= 2;
+            "Applied coral gardening!"
+        }
+        ToolKind::MicroFragmentation => {
+            stats.coral += 6;
+            stats.algae -= 3;
+            "Applied micro-fragmentation!"
+        }
+        ToolKind::RemovingPollution => {
+            stats.coral += 3;
+            stats.algae -= 3;
+            stats.ph += 0.05;
+            "Pollution removed!"
+        }
+    };
+
+    clamp_stats(stats);
+    state.message = msg.to_string(); // ✔ ONLY message, no stats
+}
+
+// === PROBLEM TIMER ===
+
 fn problem_timer_system(
     time: Res<Time>,
     mut timer: ResMut<ProblemTimer>,
@@ -169,180 +470,76 @@ fn problem_timer_system(
     mut state: ResMut<GameState>,
 ) {
     if timer.0.tick(time.delta()).just_finished() {
-        stats.coral -= 1;
-        stats.algae += 1;
-        state.turn += 1;
-        state.message = format!(
-            "Turn {} complete! Coral: {}, Algae: {}, pH: {:.2}",
-            state.turn, stats.coral, stats.algae, stats.ph
-        );
-    }
-}
+        let mut rng = rand::thread_rng();
+        let problem = rng.gen_range(1..=5);
 
-// Update UI text each frame
-fn update_stats_ui_system(
-        state: Res<GameState>,
-        stats: Res<ReefStats>,
-        mut stats_text: Query<&mut Text, (With<StatsText>, Without<MessageText>)>,
-        mut message_text: Query<&mut Text, (With<MessageText>, Without<StatsText>)>,
-    
-) {
-    if let Ok(mut text) = stats_text.get_single_mut() {
-        text.sections[0].value = format!(
-            "Turn {} | Coral: {} | Algae: {} | pH: {:.2} | Temp: {:.1}°C",
-            state.turn, stats.coral, stats.algae, stats.ph, stats.temp
-        );
-    }
-
-    if let Ok(mut msg) = message_text.get_single_mut() {
-        msg.sections[0].value = state.message.clone();
-    }
-}
-
-//unneeded?
-/*
-fn print_stats(coral: i32, algae: i32, temp: f32, ph: f32) {
-    println!(" Coral cover: {}%", coral);
-    println!(" Algae cover: {}%", algae);
-    println!(" Water temp : {:.1} °C", temp);
-    println!(" pH         : {:.2}", ph);
-}
-*/
-
-//KEEP THIS FUNCTION
-/*
-fn apply_tool(choice: u32, coral: &mut i32, algae: &mut i32, ph: &mut f32) {
-    match choice {
-        1 => { *coral += 5; println!("Applied Artificial substrates / 3D printed modules!"); }
-        2 => { *coral += 4; *algae -= 2; println!("Applied Coral gardening!"); }
-        3 => { *coral += 6; *algae -= 3; println!("Applied Micro-fragmentation!"); }
-        4 => { *coral += 3; *algae -= 3; *ph += 0.05; println!("Applied Removing pollution!"); }
-        _ => println!("Invalid tool."),
-    }
-    if *coral > 100 { *coral = 100; }
-    if *algae < 0 { *algae = 0; }
-}
-*/
-
-/*
-//KEEP THIS FUNCTION
-fn apply_problem(problem: u32, coral: &mut i32, algae: &mut i32, temp: &mut f32, ph: &mut f32) {
-    match problem {
-        1 => { println!("Pollution!");                  *coral -= 4; *algae += 5; *ph -= 0.05; }
-        2 => { println!("Invasive species!");           *coral -= 5; *algae += 4; }
-        3 => { println!("CO2 emissions rising!");       *coral -= 3; *algae += 3; *temp += 1.0; *ph -= 0.03; }
-        4 => { println!("physical damage from storm!"); *coral -= 6; *algae += 2; }
-        5 => { println!("Overfishing!");                *coral -= 4; *algae += 3; }
-        _ => {}
-    }
-    if *coral < 0 { *coral = 0; }
-    if *algae > 100 { *algae = 100; }
-}
-*/
-
-/*
-//KEEP THIS FUNCTION
-fn more_info() {
-    loop {
-        println!("Do you want more information about a problem or a tool?");
-        println!("1: I want more information about a problem");
-        println!("2: I want more information about a tool");
-        println!("3: What statistics should the reef have");
-
-        let mut option = String::new();
-        io::stdin().read_line(&mut option).expect("Failed to read");
-
-        let option: u32 = match option.trim().parse() {
-            Ok(n) => n,
-            Err(_) => {
-                println!("Invalid input, please enter 1, 2 or 3.\n");
-                continue;
-            }
-        };
-
-        match option {
+        let msg = match problem {
             1 => {
-                println!("\n--- PROBLEMS ---");
-
-                println!("POLLUTION:");
-                println!("WHAT THIS DOES TO THE CORAL REEF: Pollution from runoff, plastics, and chemicals clouds the water and blocks sunlight, reduces oxygen, and poisons coral organisms. It also encourages algae growth that competes with coral.");
-                println!("AFFECTS ON STATISTICS: Coral cover: -5%, algea cover: +5%, ph: -0.05, temperature = no change/n");
-                
-                println!("INVASIVE SPECIES:");
-                println!("WHAT THIS DOES TO THE CORAL REEF: Non-native species, like crown-of-thorns starfish or lionfish, eat coral or outcompete local fish that keep algae in check, destabilizing the reef ecosystem.");
-                println!("AFFECTS ON STATISTICS: Coral cover: -5%, algea cover: +4%, ph = no change, temperature = no change/n");
-                
-                println!("CO2 EMISSIONS RISING:");
-                println!("WHAT THIS DOES TO THE CORAL REEF: Rising CO2 causes ocean acidification (lowering pH) and warmer waters, leading to coral bleaching and slower skeleton growth.");
-                println!("AFFECTS ON STATISTICS: Coral cover: -3%, Algae cover: +3%, pH: -0.03, Temperature: +1.0°C\n");
-                
-                println!("PHYSICAL DAMAGE FROM STORM:");
-                println!("WHAT THIS DOES TO THE CORAL REEF: Strong waves from storms break coral structures and scatter fragments. Recovery takes years without restoration help.");
-                println!("AFFECTS ON STATISTICS: Coral cover: -6%, Algae cover: +2%, pH: no change, Temperature: no change\n ");
-
-                println!("OVERFISHING:");
-                println!("WHAT THIS DOES TO THE CORAL REEF: Removing too many fish—especially herbivores—causes algae to grow unchecked, reducing coral health and biodiversity.");
-                println!("AFFECTS ON STATISTICS: Coral cover: -4%, Algae cover: +3%, pH: no change, Temperature: no change\n");
+                stats.coral -= 4;
+                stats.algae += 5;
+                stats.ph -= 0.05;
+                "Pollution occurred!"
             }
             2 => {
-                println!("\n--- TOOLS / RESTORATION METHODS ---");
-
-                println!("ARTICIFIAL SUBSTRATES/3D PRINTED MODEL:");
-                println!("WHAT THIS IS: Man-made reef structures designed to provide stable surfaces for coral larvae to attach to and grow on.");
-                println!("HOW THIS HELPS THE REEF: Replaces lost habitat and encourages new coral growth by giving larvae safe, suitable surfaces. ");
-                println!("AFFECTS ON STATISTICS: Coral cover: +5%, Algae cover: no change, pH: no change\n/n");
-
-                println!("CORAL GARDENING:");
-                println!("WHAT THIS IS: Growing coral fragments in underwater nurseries and replanting them onto damaged reefs.");
-                println!("HOW THIS HELPS THE REEF: Boosts coral recovery and biodiversity by restoring live coral cover faster.");
-                println!("AFFECTS ON STATISTICS: Coral cover: +4%, Algae cover: -2%, pH: no change\n");
-
-                println!("MICRO-FRAGMENTATION:");
-                println!("WHAT THIS IS: Cutting coral into small fragments to speed up their healing and growth once reattached to the reef.");
-                println!("HOW THIS HELPS THE REEF: Rapidly increases coral cover and allows corals to fuse together, forming larger colonies faster.");
-                println!("AFFECTS ON STATISTICS: Coral cover: +6%, Algae cover: -3%, pH: no change\n");
-
-
-                println!("REMOVING POLUTION");
-                println!("WHAT THIS IS: Physically cleaning debris and reducing pollutants in the reef area.");
-                println!("HOW THIS HELPS THE REEF: Improves water quality, increases light penetration, and helps coral recover.");
-                println!("AFFECTS ON STATISTICS: Coral cover: +3%, Algae cover: -3%, pH: +0.05\n");
+                stats.coral -= 5;
+                stats.algae += 4;
+                "Invasive species appeared!"
             }
             3 => {
-                println!("\n--- REEF STATISTICS ---");
-
-                println!("UNHEALTHY REEF:");
-                println!(" Coral cover: below 20%");
-                println!(" Algae cover: above 60%");
-                println!(" pH: below 7.8");
-                println!(" Temperature: above 30°C");
-                println!(" Condition: Reef struggling, low biodiversity, frequent bleaching events.\n");
-
-                println!("HEALTHY REEF:");
-                println!(" Coral cover: 40–60%");
-                println!(" Algae cover: 10–25%");
-                println!(" pH: 8.0–8.2");
-                println!(" Temperature: 26–28°C");
-                println!(" Condition: Balanced ecosystem with strong coral growth and fish diversity.\n");
-
-                println!("GAME OVER:");
-                println!(" Coral cover: 0%");
-                println!(" Algae cover: 100%");
-                println!(" pH: below 7.7");
-                println!(" Temperature: above 32°C");
-                println!(" Condition: Coral death, ecosystem collapse, no recovery possible without intervention.\n");
-                
+                stats.coral -= 3;
+                stats.algae += 3;
+                stats.temp += 1.0;
+                stats.ph -= 0.03;
+                "CO₂ emissions increased!"
             }
-            _ => {
-                println!("Invalid input, please enter 1, 2 or 3.\n");
-                continue;
+            4 => {
+                stats.coral -= 6;
+                stats.algae += 2;
+                "Storm damage occurred!"
             }
-           
-        }
-        break;//exit the loop
+            5 => {
+                stats.coral -= 4;
+                stats.algae += 3;
+                "Overfishing event!"
+            }
+            _ => "Unknown problem",
+        };
 
-        
+        clamp_stats(&mut stats);
 
+        state.turn += 1;
+        state.message = msg.to_string(); // ✔ messages ONLY
     }
 }
-*/
+
+// === STAT CLAMP ===
+
+fn clamp_stats(stats: &mut ReefStats) {
+    stats.coral = stats.coral.clamp(0, 100);
+    stats.algae = stats.algae.clamp(0, 100);
+    stats.ph = stats.ph.clamp(0.0, 14.0);
+    stats.temp = stats.temp.clamp(0.0, 40.0);
+}
+
+// === UI UPDATE ===
+fn update_stats_ui_system(
+    state: Res<GameState>,
+    stats: Res<ReefStats>,
+    mut text_queries: ParamSet<(
+        Query<&mut Text, With<StatsText>>,
+        Query<&mut Text, With<MessageText>>,
+    )>,
+) {
+    // Update stats bar
+    if let Ok(mut text) = text_queries.p0().get_single_mut() {
+        text.sections[0].value = format!(
+            "Water pH: {:.2} | Temp: {:.1}°C | Coral: {}% | Algae: {}% | Turn {}",
+            stats.ph, stats.temp, stats.coral, stats.algae, state.turn
+        );
+    }
+
+    // Update message panel
+    if let Ok(mut text) = text_queries.p1().get_single_mut() {
+        text.sections[0].value = state.message.clone();
+    }
+}
