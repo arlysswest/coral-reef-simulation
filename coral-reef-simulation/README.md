@@ -47,11 +47,15 @@ https://img.freepik.com/premium-psd/coral-isolated-transparent-background-png-ps
 
 ## What didn't work
 
-(fill me in)
+# Trying to add all of the files to the repository
 
-## WHat lessens were learned
+I needed to either use a .gitignore or only add specific files instead of a general "git add ." without a .gitignore. I tried to push files that were too large and unecessary to add to the repository.
 
-(fill me in)
+# Not making a back up version
+
+When I tried to push the first version of the visual version with the too large of files, i messed up my git history. I lost the version in the process and had to revert back to the working version I had on githb before that. This could have been avoided had I made a backup version.
+
+## What lessens were learned
 
 ### RESEARCH
 
