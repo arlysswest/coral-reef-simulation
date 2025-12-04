@@ -2,7 +2,16 @@ use bevy::prelude::*;
 use rand::Rng;
 use std::time::Duration;
 
-// === Resources ===
+// ─── APP STATE ───────────────────────────────────────────────
+
+#[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
+enum AppState {
+    #[default]
+    StartMenu,
+    InGame,
+}
+
+// ─── RESOURCES ───────────────────────────────────────────────
 
 #[derive(Resource)]
 struct ProblemTimer(Timer);
@@ -10,7 +19,7 @@ struct ProblemTimer(Timer);
 #[derive(Resource)]
 struct GameState {
     turn: u32,
-    message: String, // ONLY messages here (no stats)
+    message: String, // messages only
 }
 
 #[derive(Resource)]
@@ -21,7 +30,7 @@ struct ReefStats {
     temp: f32,
 }
 
-// === UI Markers ===
+// ─── UI MARKERS ──────────────────────────────────────────────
 
 #[derive(Component)]
 struct StatsText;
@@ -30,18 +39,10 @@ struct StatsText;
 struct MessageText;
 
 #[derive(Component)]
-struct MapPanel;
-
-#[derive(Component)]
 struct ReefView;
 
-#[derive(Clone, Copy)]
-enum ToolKind {
-    ArtificialSubstrates,
-    CoralGardening,
-    MicroFragmentation,
-    RemovingPollution,
-}
+#[derive(Component)]
+struct MapPanel;
 
 #[derive(Component)]
 struct ToolButton {
@@ -51,7 +52,19 @@ struct ToolButton {
 #[derive(Component)]
 struct QuitButton;
 
-// === MAIN ===
+#[derive(Component)]
+struct StartButton;
+
+// Tools enum
+#[derive(Clone, Copy)]
+enum ToolKind {
+    ArtificialSubstrates,
+    CoralGardening,
+    MicroFragmentation,
+    RemovingPollution,
+}
+
+// ─── MAIN ────────────────────────────────────────────────────
 
 fn main() {
     App::new()
@@ -63,8 +76,9 @@ fn main() {
             }),
             ..default()
         }))
+        .insert_state(AppState::StartMenu) // <-- Bevy 0.14 correct state API
         .insert_resource(ProblemTimer(Timer::new(
-            Duration::from_secs(5),
+            Duration::from_secs(3),
             TimerMode::Repeating,
         )))
         .insert_resource(GameState {
@@ -77,7 +91,9 @@ fn main() {
             ph: 8.1,
             temp: 27.0,
         })
-        .add_systems(Startup, setup_ui)
+        .add_systems(Startup, setup_start_screen)
+        .add_systems(Update, start_button_system.run_if(in_state(AppState::StartMenu)))
+        .add_systems(OnEnter(AppState::InGame), setup_game_ui)
         .add_systems(
             Update,
             (
@@ -85,22 +101,113 @@ fn main() {
                 tool_button_system,
                 problem_timer_system,
                 update_stats_ui_system,
-            ),
+            )
+                .run_if(in_state(AppState::InGame)),
         )
         .run();
 }
 
-// === UI SETUP ===
+// ─────────────────────────────────────────────────────────────
+//   START SCREEN
+// ─────────────────────────────────────────────────────────────
 
-fn setup_ui(mut commands: Commands) {
+fn setup_start_screen(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
-    // Root vertical layout
+    // Root container
     commands
         .spawn(NodeBundle {
             style: Style {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            // Sea blue background
+            background_color: BackgroundColor(Color::srgb(0.0, 0.4, 0.7)),
+            ..default()
+        })
+        .with_children(|parent| {
+            // Title Text
+            parent.spawn(TextBundle::from_section(
+                "Help restore the coral reef!",
+                TextStyle {
+                    font: Default::default(),
+                    font_size: 42.0,
+                    color: Color::BLACK,
+                },
+            ));
+
+            // Start Button
+            parent
+                .spawn((
+                    ButtonBundle {
+                        style: Style {
+                            width: Val::Px(200.0),
+                            height: Val::Px(60.0),
+                            margin: UiRect::all(Val::Px(25.0)),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            border: UiRect::all(Val::Px(4.0)),
+                            ..default()
+                        },
+                        background_color: BackgroundColor(Color::srgb(1.0, 0.45, 0.25)), // coral orange
+                        border_color: BorderColor(Color::BLACK),
+                        ..default()
+                    },
+                    StartButton,
+                ))
+                .with_children(|btn| {
+                    btn.spawn(TextBundle::from_section(
+                        "START",
+                        TextStyle {
+                            font: Default::default(),
+                            font_size: 32.0,
+                            color: Color::BLACK,
+                        },
+                    ));
+                });
+        });
+}
+
+fn start_button_system(
+    mut interaction_query: Query<&Interaction, (Changed<Interaction>, With<StartButton>)>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut commands: Commands,
+    root_nodes: Query<Entity, With<Node>>,
+) {
+    for interaction in &mut interaction_query {
+        if *interaction == Interaction::Pressed {
+            // Remove the start menu UI
+            for entity in &root_nodes {
+                commands.entity(entity).despawn_recursive();
+            }
+            next_state.set(AppState::InGame);
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+//   GAME UI SETUP
+// ─────────────────────────────────────────────────────────────
+
+fn setup_game_ui(
+    mut commands: Commands,
+    mut timer: ResMut<ProblemTimer>,
+) {
+    timer.0.reset();
+    timer.0.pause(); // Will unpause after UI loads
+
+    commands.spawn(Camera2dBundle::default());
+
+    // Root container
+    commands
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
@@ -108,22 +215,24 @@ fn setup_ui(mut commands: Commands) {
             ..default()
         })
         .with_children(|root| {
-            // === Top Bar (Quit button) ===
+            //
+            // ─── TOP BAR (QUIT BUTTON)
+            //
             root.spawn(NodeBundle {
                 style: Style {
                     width: Val::Percent(100.0),
                     height: Val::Px(40.0),
                     flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::FlexStart,
                     align_items: AlignItems::Center,
+                    justify_content: JustifyContent::FlexStart,
                     padding: UiRect::all(Val::Px(6.0)),
                     ..default()
                 },
                 background_color: BackgroundColor(Color::srgb(0.05, 0.05, 0.1)),
                 ..default()
             })
-            .with_children(|bar| {
-                bar.spawn((
+            .with_children(|top| {
+                top.spawn((
                     ButtonBundle {
                         style: Style {
                             width: Val::Px(60.0),
@@ -138,8 +247,8 @@ fn setup_ui(mut commands: Commands) {
                     },
                     QuitButton,
                 ))
-                .with_children(|btn| {
-                    btn.spawn(TextBundle::from_section(
+                .with_children(|b| {
+                    b.spawn(TextBundle::from_section(
                         "Quit",
                         TextStyle {
                             font: Default::default(),
@@ -150,7 +259,9 @@ fn setup_ui(mut commands: Commands) {
                 });
             });
 
-            // === Main Content (reef + sidebar) ===
+            //
+            // ─── MAIN CONTENT (REEF + SIDEBAR)
+            //
             root.spawn(NodeBundle {
                 style: Style {
                     width: Val::Percent(100.0),
@@ -160,146 +271,149 @@ fn setup_ui(mut commands: Commands) {
                 },
                 ..default()
             })
-            .with_children(|main_row| {
-                // LEFT — Reef View
-                main_row
-                    .spawn((
-                        NodeBundle {
-                            style: Style {
-                                flex_grow: 3.0,
-                                margin: UiRect::all(Val::Px(8.0)),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                            background_color: BackgroundColor(Color::srgb(0.1, 0.25, 0.5)),
-                            ..default()
-                        },
-                        ReefView,
-                    ))
-                    .with_children(|reef| {
-                        reef.spawn(TextBundle::from_section(
-                            "Reef View (visuals coming soon)",
-                            TextStyle {
-                                font: Default::default(),
-                                font_size: 22.0,
-                                color: Color::WHITE,
-                            },
-                        ));
-                    });
-
-                // RIGHT — Sidebar
-                main_row
-                    .spawn(NodeBundle {
+            .with_children(|row| {
+                //
+                // LEFT — REEF VIEW
+                //
+                row.spawn((
+                    NodeBundle {
                         style: Style {
-                            flex_grow: 1.0,
-                            flex_direction: FlexDirection::Column,
-                            row_gap: Val::Px(8.0),
-                            margin: UiRect::all(Val::Px(8.0)),
+                            flex_grow: 3.0,
+                            margin: UiRect::all(Val::Px(10.0)),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
                             ..default()
                         },
+                        background_color: BackgroundColor(Color::srgb(0.1, 0.25, 0.5)),
                         ..default()
-                    })
-                    .with_children(|sidebar| {
-                        // === MAP (TOP RIGHT) ===
-                        sidebar
-                            .spawn((
-                                NodeBundle {
-                                    style: Style {
-                                        height: Val::Percent(25.0),
-                                        padding: UiRect::all(Val::Px(8.0)),
-                                        flex_direction: FlexDirection::Column,
-                                        justify_content: JustifyContent::Center,
-                                        align_items: AlignItems::Center,
-                                        ..default()
-                                    },
-                                    background_color: BackgroundColor(Color::srgb(
-                                        0.05, 0.2, 0.25,
-                                    )),
+                    },
+                    ReefView,
+                ))
+                .with_children(|reef| {
+                    reef.spawn(TextBundle::from_section(
+                        "Reef View (visuals coming soon)",
+                        TextStyle {
+                            font: Default::default(),
+                            font_size: 22.0,
+                            color: Color::WHITE,
+                        },
+                    ));
+                });
+
+                //
+                // RIGHT — SIDEBAR
+                //
+                row.spawn(NodeBundle {
+                    style: Style {
+                        flex_grow: 1.0,
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(10.0),
+                        margin: UiRect::all(Val::Px(10.0)),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|sidebar| {
+                    //
+                    // MAP PANEL (TOP RIGHT)
+                    //
+                    sidebar
+                        .spawn((
+                            NodeBundle {
+                                style: Style {
+                                    height: Val::Percent(25.0),
+                                    padding: UiRect::all(Val::Px(10.0)),
+                                    justify_content: JustifyContent::Center,
+                                    align_items: AlignItems::Center,
+                                    flex_direction: FlexDirection::Column,
                                     ..default()
                                 },
-                                MapPanel,
-                            ))
-                            .with_children(|map| {
-                                map.spawn(TextBundle::from_section(
-                                    "Map (Future Feature)",
+                                background_color: BackgroundColor(Color::srgb(
+                                    0.05, 0.2, 0.25,
+                                )),
+                                ..default()
+                            },
+                            MapPanel,
+                        ))
+                        .with_children(|map| {
+                            map.spawn(TextBundle::from_section(
+                                "Map (Future Feature)",
+                                TextStyle {
+                                    font: Default::default(),
+                                    font_size: 18.0,
+                                    color: Color::WHITE,
+                                },
+                            ));
+                        });
+
+                    //
+                    // MESSAGES PANEL (BELOW MAP)
+                    //
+                    sidebar
+                        .spawn(NodeBundle {
+                            style: Style {
+                                height: Val::Percent(30.0),
+                                padding: UiRect::all(Val::Px(10.0)),
+                                flex_direction: FlexDirection::Column,
+                                ..default()
+                            },
+                            background_color: BackgroundColor(Color::srgb(
+                                0.05, 0.15, 0.35,
+                            )),
+                            ..default()
+                        })
+                        .with_children(|msg_panel| {
+                            msg_panel.spawn(TextBundle::from_section(
+                                "Messages",
+                                TextStyle {
+                                    font: Default::default(),
+                                    font_size: 22.0,
+                                    color: Color::srgb(0.8, 0.9, 1.0),
+                                },
+                            ));
+
+                            msg_panel.spawn((
+                                TextBundle::from_section(
+                                    "Simulation Started!",
                                     TextStyle {
                                         font: Default::default(),
                                         font_size: 18.0,
                                         color: Color::WHITE,
                                     },
-                                ));
-                            });
+                                ),
+                                MessageText,
+                            ));
+                        });
 
-                        // === MESSAGES (Under Map) ===
-                        sidebar
-                            .spawn(NodeBundle {
-                                style: Style {
-                                    height: Val::Percent(30.0),
-                                    padding: UiRect::all(Val::Px(8.0)),
-                                    flex_direction: FlexDirection::Column,
-                                    ..default()
-                                },
-                                background_color: BackgroundColor(Color::srgb(
-                                    0.05, 0.15, 0.35,
-                                )),
+                    //
+                    // TOOLS PANEL
+                    //
+                    sidebar
+                        .spawn(NodeBundle {
+                            style: Style {
+                                height: Val::Percent(45.0),
+                                padding: UiRect::all(Val::Px(10.0)),
+                                flex_direction: FlexDirection::Column,
+                                row_gap: Val::Px(6.0),
                                 ..default()
-                            })
-                            .with_children(|msg_panel| {
-                                msg_panel.spawn(TextBundle::from_section(
-                                    "Messages",
-                                    TextStyle {
-                                        font: Default::default(),
-                                        font_size: 22.0,
-                                        color: Color::srgb(0.8, 0.9, 1.0),
-                                    },
-                                ));
-
-                                msg_panel.spawn((
-                                    TextBundle::from_section(
-                                        "Welcome! Use tools to improve the reef.",
-                                        TextStyle {
-                                            font: Default::default(),
-                                            font_size: 18.0,
-                                            color: Color::WHITE,
-                                        },
-                                    )
-                                    .with_style(Style {
-                                        margin: UiRect::top(Val::Px(6.0)),
-                                        ..default()
-                                    }),
-                                    MessageText,
-                                ));
-                            });
-
-                        // === TOOLS (Bottom right) ===
-                        sidebar
-                            .spawn(NodeBundle {
-                                style: Style {
-                                    height: Val::Percent(45.0),
-                                    padding: UiRect::all(Val::Px(8.0)),
-                                    flex_direction: FlexDirection::Column,
-                                    row_gap: Val::Px(6.0),
-                                    ..default()
+                            },
+                            background_color: BackgroundColor(Color::srgb(
+                                0.06, 0.18, 0.28,
+                            )),
+                            ..default()
+                        })
+                        .with_children(|tools| {
+                            tools.spawn(TextBundle::from_section(
+                                "Tools",
+                                TextStyle {
+                                    font: Default::default(),
+                                    font_size: 22.0,
+                                    color: Color::srgb(0.8, 0.9, 1.0),
                                 },
-                                background_color: BackgroundColor(Color::srgb(
-                                    0.06, 0.18, 0.28,
-                                )),
-                                ..default()
-                            })
-                            .with_children(|tools| {
-                                tools.spawn(TextBundle::from_section(
-                                    "Tools",
-                                    TextStyle {
-                                        font: Default::default(),
-                                        font_size: 22.0,
-                                        color: Color::srgb(0.8, 0.9, 1.0),
-                                    },
-                                ));
+                            ));
 
-                                let spawn_tool = |label: &str,
-                                                  kind: ToolKind,
-                                                  parent: &mut ChildBuilder| {
+                            let spawn_tool =
+                                |label: &str, kind: ToolKind, parent: &mut ChildBuilder| {
                                     parent
                                         .spawn((
                                             ButtonBundle {
@@ -329,38 +443,40 @@ fn setup_ui(mut commands: Commands) {
                                         });
                                 };
 
-                                spawn_tool(
-                                    "Artificial substrates / 3D modules",
-                                    ToolKind::ArtificialSubstrates,
-                                    tools,
-                                );
-                                spawn_tool(
-                                    "Coral gardening",
-                                    ToolKind::CoralGardening,
-                                    tools,
-                                );
-                                spawn_tool(
-                                    "Micro-fragmentation",
-                                    ToolKind::MicroFragmentation,
-                                    tools,
-                                );
-                                spawn_tool(
-                                    "Removing pollution",
-                                    ToolKind::RemovingPollution,
-                                    tools,
-                                );
-                            });
-                    });
+                            spawn_tool(
+                                "Artificial substrates / 3D modules",
+                                ToolKind::ArtificialSubstrates,
+                                tools,
+                            );
+                            spawn_tool(
+                                "Coral gardening",
+                                ToolKind::CoralGardening,
+                                tools,
+                            );
+                            spawn_tool(
+                                "Micro-fragmentation",
+                                ToolKind::MicroFragmentation,
+                                tools,
+                            );
+                            spawn_tool(
+                                "Removing pollution",
+                                ToolKind::RemovingPollution,
+                                tools,
+                            );
+                        });
+                });
             });
 
-            // === Bottom Stats Bar ===
+            //
+            // BOTTOM — STATS BAR
+            //
             root.spawn(NodeBundle {
                 style: Style {
                     width: Val::Percent(100.0),
                     height: Val::Percent(10.0),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
-                    padding: UiRect::all(Val::Px(8.0)),
+                    padding: UiRect::all(Val::Px(10.0)),
                     ..default()
                 },
                 background_color: BackgroundColor(Color::srgb(0.02, 0.05, 0.12)),
@@ -369,7 +485,7 @@ fn setup_ui(mut commands: Commands) {
             .with_children(|stats_row| {
                 stats_row.spawn((
                     TextBundle::from_section(
-                        "Stats loading...",
+                        "Water pH: 0 | Temp: 0 | Coral: 0 | Algae: 0 | Turn 0",
                         TextStyle {
                             font: Default::default(),
                             font_size: 20.0,
@@ -380,9 +496,14 @@ fn setup_ui(mut commands: Commands) {
                 ));
             });
         });
+
+    // Start the 3-second problem timer AFTER UI loads
+    timer.0.unpause();
 }
 
-// === QUIT BUTTON SYSTEM ===
+// ─────────────────────────────────────────────────────────────
+//   QUIT BUTTON
+// ─────────────────────────────────────────────────────────────
 
 fn quit_button_system(
     mut interaction_query: Query<
@@ -407,7 +528,9 @@ fn quit_button_system(
     }
 }
 
-// === TOOL BUTTONS ===
+// ─────────────────────────────────────────────────────────────
+//   TOOLS LOGIC
+// ─────────────────────────────────────────────────────────────
 
 fn tool_button_system(
     mut interaction_query: Query<
@@ -416,11 +539,17 @@ fn tool_button_system(
     >,
     mut stats: ResMut<ReefStats>,
     mut state: ResMut<GameState>,
+    mut timer: ResMut<ProblemTimer>,
 ) {
     for (interaction, mut color, tool_button) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
                 apply_tool(tool_button.kind, &mut stats, &mut state);
+
+                // Reset problem timer — new event in 3 seconds
+                timer.0.reset();
+                timer.0.unpause();
+
                 *color = BackgroundColor(Color::srgb(0.3, 0.9, 0.4));
             }
             Interaction::Hovered => {
@@ -458,10 +587,12 @@ fn apply_tool(kind: ToolKind, stats: &mut ReefStats, state: &mut GameState) {
     };
 
     clamp_stats(stats);
-    state.message = msg.to_string(); // ✔ ONLY message, no stats
+    state.message = msg.to_string();
 }
 
-// === PROBLEM TIMER ===
+// ─────────────────────────────────────────────────────────────
+//   RANDOM PROBLEMS
+// ─────────────────────────────────────────────────────────────
 
 fn problem_timer_system(
     time: Res<Time>,
@@ -471,9 +602,9 @@ fn problem_timer_system(
 ) {
     if timer.0.tick(time.delta()).just_finished() {
         let mut rng = rand::thread_rng();
-        let problem = rng.gen_range(1..=5);
+        let p = rng.gen_range(1..=5);
 
-        let msg = match problem {
+        let msg = match p {
             1 => {
                 stats.coral -= 4;
                 stats.algae += 5;
@@ -506,13 +637,14 @@ fn problem_timer_system(
         };
 
         clamp_stats(&mut stats);
-
         state.turn += 1;
-        state.message = msg.to_string(); // ✔ messages ONLY
+        state.message = msg.to_string();
     }
 }
 
-// === STAT CLAMP ===
+// ─────────────────────────────────────────────────────────────
+//   CLAMP STATS
+// ─────────────────────────────────────────────────────────────
 
 fn clamp_stats(stats: &mut ReefStats) {
     stats.coral = stats.coral.clamp(0, 100);
@@ -521,7 +653,10 @@ fn clamp_stats(stats: &mut ReefStats) {
     stats.temp = stats.temp.clamp(0.0, 40.0);
 }
 
-// === UI UPDATE ===
+// ─────────────────────────────────────────────────────────────
+//   UPDATE UI TEXT
+// ─────────────────────────────────────────────────────────────
+
 fn update_stats_ui_system(
     state: Res<GameState>,
     stats: Res<ReefStats>,
@@ -530,16 +665,17 @@ fn update_stats_ui_system(
         Query<&mut Text, With<MessageText>>,
     )>,
 ) {
-    // Update stats bar
-    if let Ok(mut text) = text_queries.p0().get_single_mut() {
-        text.sections[0].value = format!(
+    // Bottom stats
+    if let Ok(mut txt) = text_queries.p0().get_single_mut() {
+        txt.sections[0].value = format!(
             "Water pH: {:.2} | Temp: {:.1}°C | Coral: {}% | Algae: {}% | Turn {}",
             stats.ph, stats.temp, stats.coral, stats.algae, state.turn
         );
     }
 
-    // Update message panel
-    if let Ok(mut text) = text_queries.p1().get_single_mut() {
-        text.sections[0].value = state.message.clone();
+    // Messages panel
+    if let Ok(mut msg) = text_queries.p1().get_single_mut() {
+        msg.sections[0].value = state.message.clone();
     }
 }
+
