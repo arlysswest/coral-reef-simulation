@@ -1,17 +1,23 @@
 //CHANGES TO ADD
 
-// FINSIHED !!
-// 1. Game over = coral cover = 0%
-// redirects to 2 options: either quit or restart -> done
-// 2. problems should only occur once after each tool is applied and once at the beggining -> done
+//FINSIHED
+// coral reef display !!
 
-//NEEDS IMROVEMENT:
-// 3. work on improving coral reef display - right now its just color blocks I wnat it to display actual corals 
+//ADD NEXT !!
+// 1. MAP FEATURE
+// 3x3 grid
+// click on map to expand
+// small close button in top left cprner when expanded
+// when map is expanded u can click on a different section to change locations
+// simulation will start in top left box
+//  - healthy reef = orange square
+// - unhealthy square = white square 
+// - typical reef (starting) = sea blue square
 
-//WHAT TO FOCUS ON LATER:
-// 1. add map feature
-// 2. get rid of warnings !!
-// 3. finsh README.md
+// WORK ON LATER (ignore for now)!!
+// 1. get rid of warnings !!
+// 2. works on different size display screens !
+// 2. finsh README.md
 
 use bevy::prelude::*;
 use rand::Rng;

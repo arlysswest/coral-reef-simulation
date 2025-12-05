@@ -31,16 +31,6 @@ the full program design is located in "project-plan.pdf"
 
     bevy 0.14
 
-## TOOLS USED
-
-# Game Engine
-
-    Bevy version 0.14
-
-# Coral Image
-
-https://img.freepik.com/premium-psd/coral-isolated-transparent-background-png-psd_888962-433.jpg
-
 ## BRANCHES
 
 1. main -> contains finsihed version or current best version
@@ -92,6 +82,10 @@ used chatgpt to pick color codes:
 - "color code for sea blue?"
 - "color code for coral orange?"
 - "What colors would look good in combination with my current colors?"
+
+# AI generated Image of a coral
+
+I couldn't find an open source & free transparent image of a coral to use online. I could have created the code to draw the coral over and over, but I decided to not use that method. Instead I asked AI to generate an orange coral with a transparent background. This image is in the assets folder with the name "coral-transparent.png"
 
 ## Coral Reef Research
 
