@@ -1,11 +1,9 @@
 //WHAT TO WORK ON TO FINSIH THE PROJECT !!
-// 3. cargo clippy / rustfmt errors 
-// 4. fix repo file organization issue 
-//5. add tests
+// 2. fix repo file organization issue
 
 // NOTE:
 //" WARN bevy_winit::state: Skipped event Destroyed for unknown winit Window Id WindowId(140343576157488)"
-// -> issue with macos / bevy and can only  be stopped by muting the warning. 
+// -> issue with macos / bevy and can only  be stopped by muting the warning.
 // -> It does not mean anything is wrong and does not need to be fixed.
 
 use bevy::prelude::*;
@@ -169,7 +167,10 @@ fn main() {
         })
         .insert_resource(MapState::new())
         .add_systems(Startup, setup_start_screen)
-        .add_systems(Update, start_button_system.run_if(in_state(AppState::StartMenu)))
+        .add_systems(
+            Update,
+            start_button_system.run_if(in_state(AppState::StartMenu)),
+        )
         .add_systems(OnEnter(AppState::InGame), setup_game_ui)
         .add_systems(OnEnter(AppState::GameOver), setup_game_over)
         .add_systems(
@@ -230,34 +231,33 @@ fn setup_start_screen(mut commands: Commands) {
                 },
             ));
 
-            root
-                .spawn((
-                    ButtonBundle {
-                        style: Style {
-                            width: Val::Px(200.0),
-                            height: Val::Px(60.0),
-                            margin: UiRect::all(Val::Px(25.0)),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            border: UiRect::all(Val::Px(4.0)),
-                            ..default()
-                        },
-                        background_color: BackgroundColor(Color::srgb(1.0, 0.45, 0.25)),
-                        border_color: BorderColor(Color::BLACK),
+            root.spawn((
+                ButtonBundle {
+                    style: Style {
+                        width: Val::Px(200.0),
+                        height: Val::Px(60.0),
+                        margin: UiRect::all(Val::Px(25.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(4.0)),
                         ..default()
                     },
-                    StartButton,
-                ))
-                .with_children(|btn| {
-                    btn.spawn(TextBundle::from_section(
-                        "START",
-                        TextStyle {
-                            font: Default::default(),
-                            font_size: 32.0,
-                            color: Color::BLACK,
-                        },
-                    ));
-                });
+                    background_color: BackgroundColor(Color::srgb(1.0, 0.45, 0.25)),
+                    border_color: BorderColor(Color::BLACK),
+                    ..default()
+                },
+                StartButton,
+            ))
+            .with_children(|btn| {
+                btn.spawn(TextBundle::from_section(
+                    "START",
+                    TextStyle {
+                        font: Default::default(),
+                        font_size: 32.0,
+                        color: Color::BLACK,
+                    },
+                ));
+            });
         });
 }
 
@@ -368,260 +368,229 @@ fn setup_game_ui(
             });
 
             // MAIN ROW
-            root
-                .spawn(NodeBundle {
+            root.spawn(NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(80.0),
+                    flex_direction: FlexDirection::Row,
+                    ..default()
+                },
+                ..default()
+            })
+            .with_children(|row| {
+                //
+                // LEFT: REEF VIEW
+                //
+                row.spawn((
+                    NodeBundle {
+                        style: Style {
+                            flex_grow: 3.0,
+                            margin: UiRect::all(Val::Px(10.0)),
+                            position_type: PositionType::Relative,
+                            justify_content: JustifyContent::FlexStart,
+                            align_items: AlignItems::FlexStart,
+                            ..default()
+                        },
+                        background_color: BackgroundColor(Color::srgb(0.0, 0.4, 0.7)),
+                        ..default()
+                    },
+                    ReefView,
+                ));
+
+                //
+                // RIGHT COLUMN
+                //
+                row.spawn(NodeBundle {
                     style: Style {
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(80.0),
-                        flex_direction: FlexDirection::Row,
+                        flex_grow: 1.0,
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(10.0),
+                        margin: UiRect::all(Val::Px(10.0)),
                         ..default()
                     },
                     ..default()
                 })
-                .with_children(|row| {
-                    //
-                    // LEFT: REEF VIEW
-                    //
-                    row
-                        .spawn((
-                            NodeBundle {
-                                style: Style {
-                                    flex_grow: 3.0,
-                                    margin: UiRect::all(Val::Px(10.0)),
-                                    position_type: PositionType::Relative,
-                                    justify_content: JustifyContent::FlexStart,
-                                    align_items: AlignItems::FlexStart,
-                                    ..default()
-                                },
-                                background_color: BackgroundColor(Color::srgb(0.0, 0.4, 0.7)),
-                                ..default()
-                            },
-                            ReefView,
-                        ));
-
-                    //
-                    // RIGHT COLUMN
-                    //
-                    row
+                .with_children(|sidebar| {
+                    // MAP BOX
+                    sidebar
                         .spawn(NodeBundle {
                             style: Style {
-                                flex_grow: 1.0,
+                                height: Val::Percent(25.0),
+                                padding: UiRect::all(Val::Px(10.0)),
                                 flex_direction: FlexDirection::Column,
-                                row_gap: Val::Px(10.0),
-                                margin: UiRect::all(Val::Px(10.0)),
+                                row_gap: Val::Px(6.0),
                                 ..default()
                             },
+                            background_color: BackgroundColor(Color::srgb(0.05, 0.2, 0.25)),
                             ..default()
                         })
-                        .with_children(|sidebar| {
-                            // MAP BOX
-                            sidebar
-                                .spawn(NodeBundle {
-                                    style: Style {
-                                        height: Val::Percent(25.0),
-                                        padding: UiRect::all(Val::Px(10.0)),
-                                        flex_direction: FlexDirection::Column,
-                                        row_gap: Val::Px(6.0),
+                        .with_children(|map_box| {
+                            map_box.spawn(TextBundle::from_section(
+                                "Map (click to expand)",
+                                TextStyle {
+                                    font: Default::default(),
+                                    font_size: 18.0,
+                                    color: Color::WHITE,
+                                },
+                            ));
+
+                            // Mini map button (3x3)
+                            map_box
+                                .spawn((
+                                    ButtonBundle {
+                                        style: Style {
+                                            width: Val::Percent(100.0),
+                                            height: Val::Px(80.0),
+                                            justify_content: JustifyContent::Center,
+                                            align_items: AlignItems::Center,
+                                            flex_direction: FlexDirection::Column,
+                                            ..default()
+                                        },
+                                        background_color: BackgroundColor(Color::srgb(
+                                            0.02, 0.08, 0.15,
+                                        )),
                                         ..default()
                                     },
-                                    background_color: BackgroundColor(Color::srgb(
-                                        0.05, 0.2, 0.25,
-                                    )),
-                                    ..default()
-                                })
-                                .with_children(|map_box| {
-                                    map_box.spawn(TextBundle::from_section(
-                                        "Map (click to expand)",
-                                        TextStyle {
-                                            font: Default::default(),
-                                            font_size: 18.0,
-                                            color: Color::WHITE,
-                                        },
-                                    ));
+                                    MapMiniRoot,
+                                ))
+                                .with_children(|mini| {
+                                    for y in 0..3 {
+                                        mini.spawn(NodeBundle {
+                                            style: Style {
+                                                width: Val::Percent(100.0),
+                                                height: Val::Percent(33.33),
+                                                flex_direction: FlexDirection::Row,
+                                                ..default()
+                                            },
+                                            background_color: BackgroundColor(Color::NONE),
+                                            ..default()
+                                        })
+                                        .with_children(
+                                            move |row_node| {
+                                                for x in 0..3 {
+                                                    row_node.spawn((
+                                                        NodeBundle {
+                                                            style: Style {
+                                                                width: Val::Percent(33.33),
+                                                                height: Val::Percent(100.0),
+                                                                margin: UiRect::all(Val::Px(1.0)),
+                                                                border: UiRect::all(Val::Px(3.0)),
+                                                                ..default()
+                                                            },
+                                                            background_color: BackgroundColor(
+                                                                Color::srgb(0.0, 0.4, 0.7),
+                                                            ), // will be updated
+                                                            border_color: BorderColor(Color::BLACK),
+                                                            ..default()
+                                                        },
+                                                        MapMiniCell { x, y },
+                                                    ));
+                                                }
+                                            },
+                                        );
+                                    }
+                                });
+                        });
 
-                                    // Mini map button (3x3)
-                                    map_box
+                    // MESSAGES
+                    sidebar
+                        .spawn(NodeBundle {
+                            style: Style {
+                                height: Val::Percent(30.0),
+                                padding: UiRect::all(Val::Px(10.0)),
+                                flex_direction: FlexDirection::Column,
+                                ..default()
+                            },
+                            background_color: BackgroundColor(Color::srgb(0.05, 0.15, 0.35)),
+                            ..default()
+                        })
+                        .with_children(|msgs| {
+                            msgs.spawn(TextBundle::from_section(
+                                "Messages",
+                                TextStyle {
+                                    font: Default::default(),
+                                    font_size: 22.0,
+                                    color: Color::srgb(0.8, 0.9, 1.0),
+                                },
+                            ));
+                            msgs.spawn((
+                                TextBundle::from_section(
+                                    "Simulation Started!",
+                                    TextStyle {
+                                        font: Default::default(),
+                                        font_size: 18.0,
+                                        color: Color::WHITE,
+                                    },
+                                ),
+                                MessageText,
+                            ));
+                        });
+
+                    // TOOLS
+                    sidebar
+                        .spawn(NodeBundle {
+                            style: Style {
+                                height: Val::Percent(45.0),
+                                padding: UiRect::all(Val::Px(10.0)),
+                                flex_direction: FlexDirection::Column,
+                                row_gap: Val::Px(6.0),
+                                ..default()
+                            },
+                            background_color: BackgroundColor(Color::srgb(0.06, 0.18, 0.28)),
+                            ..default()
+                        })
+                        .with_children(|tools| {
+                            tools.spawn(TextBundle::from_section(
+                                "Tools",
+                                TextStyle {
+                                    font: Default::default(),
+                                    font_size: 22.0,
+                                    color: Color::srgb(0.8, 0.9, 1.0),
+                                },
+                            ));
+
+                            let spawn_tool =
+                                |label: &str, kind: ToolKind, parent: &mut ChildBuilder| {
+                                    parent
                                         .spawn((
                                             ButtonBundle {
                                                 style: Style {
+                                                    height: Val::Px(32.0),
                                                     width: Val::Percent(100.0),
-                                                    height: Val::Px(80.0),
                                                     justify_content: JustifyContent::Center,
                                                     align_items: AlignItems::Center,
-                                                    flex_direction: FlexDirection::Column,
                                                     ..default()
                                                 },
-                                                background_color: BackgroundColor(
-                                                    Color::srgb(0.02, 0.08, 0.15),
-                                                ),
+                                                background_color: BackgroundColor(Color::srgb(
+                                                    0.9, 0.8, 0.3,
+                                                )),
                                                 ..default()
                                             },
-                                            MapMiniRoot,
+                                            ToolButton { kind },
                                         ))
-                                        .with_children(|mini| {
-                                            for y in 0..3 {
-                                                mini.spawn(NodeBundle {
-                                                    style: Style {
-                                                        width: Val::Percent(100.0),
-                                                        height: Val::Percent(33.33),
-                                                        flex_direction: FlexDirection::Row,
-                                                        ..default()
-                                                    },
-                                                    background_color: BackgroundColor(
-                                                        Color::NONE,
-                                                    ),
-                                                    ..default()
-                                                })
-                                                .with_children(move |row_node| {
-                                                    for x in 0..3 {
-                                                        row_node.spawn((
-                                                            NodeBundle {
-                                                                style: Style {
-                                                                    width: Val::Percent(33.33),
-                                                                    height: Val::Percent(100.0),
-                                                                    margin: UiRect::all(
-                                                                        Val::Px(1.0),
-                                                                    ),
-                                                                    border: UiRect::all(
-                                                                        Val::Px(3.0),
-                                                                    ),
-                                                                    ..default()
-                                                                },
-                                                                background_color:
-                                                                    BackgroundColor(
-                                                                        Color::srgb(
-                                                                            0.0, 0.4, 0.7,
-                                                                        ),
-                                                                    ), // will be updated
-                                                                border_color: BorderColor(
-                                                                    Color::BLACK,
-                                                                ),
-                                                                ..default()
-                                                            },
-                                                            MapMiniCell { x, y },
-                                                        ));
-                                                    }
-                                                });
-                                            }
+                                        .with_children(|b| {
+                                            b.spawn(TextBundle::from_section(
+                                                label,
+                                                TextStyle {
+                                                    font: Default::default(),
+                                                    font_size: 16.0,
+                                                    color: Color::BLACK,
+                                                },
+                                            ));
                                         });
-                                });
+                                };
 
-                            // MESSAGES
-                            sidebar
-                                .spawn(NodeBundle {
-                                    style: Style {
-                                        height: Val::Percent(30.0),
-                                        padding: UiRect::all(Val::Px(10.0)),
-                                        flex_direction: FlexDirection::Column,
-                                        ..default()
-                                    },
-                                    background_color: BackgroundColor(Color::srgb(
-                                        0.05, 0.15, 0.35,
-                                    )),
-                                    ..default()
-                                })
-                                .with_children(|msgs| {
-                                    msgs.spawn(TextBundle::from_section(
-                                        "Messages",
-                                        TextStyle {
-                                            font: Default::default(),
-                                            font_size: 22.0,
-                                            color: Color::srgb(0.8, 0.9, 1.0),
-                                        },
-                                    ));
-                                    msgs.spawn((
-                                        TextBundle::from_section(
-                                            "Simulation Started!",
-                                            TextStyle {
-                                                font: Default::default(),
-                                                font_size: 18.0,
-                                                color: Color::WHITE,
-                                            },
-                                        ),
-                                        MessageText,
-                                    ));
-                                });
-
-                            // TOOLS
-                            sidebar
-                                .spawn(NodeBundle {
-                                    style: Style {
-                                        height: Val::Percent(45.0),
-                                        padding: UiRect::all(Val::Px(10.0)),
-                                        flex_direction: FlexDirection::Column,
-                                        row_gap: Val::Px(6.0),
-                                        ..default()
-                                    },
-                                    background_color: BackgroundColor(Color::srgb(
-                                        0.06, 0.18, 0.28,
-                                    )),
-                                    ..default()
-                                })
-                                .with_children(|tools| {
-                                    tools.spawn(TextBundle::from_section(
-                                        "Tools",
-                                        TextStyle {
-                                            font: Default::default(),
-                                            font_size: 22.0,
-                                            color: Color::srgb(0.8, 0.9, 1.0),
-                                        },
-                                    ));
-
-                                    let spawn_tool =
-                                        |label: &str, kind: ToolKind, parent: &mut ChildBuilder| {
-                                            parent
-                                                .spawn((
-                                                    ButtonBundle {
-                                                        style: Style {
-                                                            height: Val::Px(32.0),
-                                                            width: Val::Percent(100.0),
-                                                            justify_content: JustifyContent::Center,
-                                                            align_items: AlignItems::Center,
-                                                            ..default()
-                                                        },
-                                                        background_color:
-                                                            BackgroundColor(Color::srgb(
-                                                                0.9, 0.8, 0.3,
-                                                            )),
-                                                        ..default()
-                                                    },
-                                                    ToolButton { kind },
-                                                ))
-                                                .with_children(|b| {
-                                                    b.spawn(TextBundle::from_section(
-                                                        label,
-                                                        TextStyle {
-                                                            font: Default::default(),
-                                                            font_size: 16.0,
-                                                            color: Color::BLACK,
-                                                        },
-                                                    ));
-                                                });
-                                        };
-
-                                    spawn_tool(
-                                        "Artificial substrates / 3D modules",
-                                        ToolKind::ArtificialSubstrates,
-                                        tools,
-                                    );
-                                    spawn_tool(
-                                        "Coral gardening",
-                                        ToolKind::CoralGardening,
-                                        tools,
-                                    );
-                                    spawn_tool(
-                                        "Micro-fragmentation",
-                                        ToolKind::MicroFragmentation,
-                                        tools,
-                                    );
-                                    spawn_tool(
-                                        "Removing pollution",
-                                        ToolKind::RemovingPollution,
-                                        tools,
-                                    );
-                                });
+                            spawn_tool(
+                                "Artificial substrates / 3D modules",
+                                ToolKind::ArtificialSubstrates,
+                                tools,
+                            );
+                            spawn_tool("Coral gardening", ToolKind::CoralGardening, tools);
+                            spawn_tool("Micro-fragmentation", ToolKind::MicroFragmentation, tools);
+                            spawn_tool("Removing pollution", ToolKind::RemovingPollution, tools);
                         });
                 });
+            });
 
             // BOTTOM STATS BAR
             root.spawn(NodeBundle {
@@ -688,58 +657,56 @@ fn setup_game_over(mut commands: Commands, nodes: Query<Entity, With<Node>>) {
                 },
             ));
 
-            root
-                .spawn((
-                    ButtonBundle {
-                        style: Style {
-                            width: Val::Px(220.0),
-                            height: Val::Px(60.0),
-                            margin: UiRect::all(Val::Px(20.0)),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            ..default()
-                        },
-                        background_color: BackgroundColor(Color::srgb(0.3, 0.9, 0.4)),
+            root.spawn((
+                ButtonBundle {
+                    style: Style {
+                        width: Val::Px(220.0),
+                        height: Val::Px(60.0),
+                        margin: UiRect::all(Val::Px(20.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
                         ..default()
                     },
-                    RestartButton,
-                ))
-                .with_children(|b| {
-                    b.spawn(TextBundle::from_section(
-                        "RESTART",
-                        TextStyle {
-                            font: Default::default(),
-                            font_size: 28.,
-                            color: Color::BLACK,
-                        },
-                    ));
-                });
+                    background_color: BackgroundColor(Color::srgb(0.3, 0.9, 0.4)),
+                    ..default()
+                },
+                RestartButton,
+            ))
+            .with_children(|b| {
+                b.spawn(TextBundle::from_section(
+                    "RESTART",
+                    TextStyle {
+                        font: Default::default(),
+                        font_size: 28.,
+                        color: Color::BLACK,
+                    },
+                ));
+            });
 
-            root
-                .spawn((
-                    ButtonBundle {
-                        style: Style {
-                            width: Val::Px(220.0),
-                            height: Val::Px(60.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            ..default()
-                        },
-                        background_color: BackgroundColor(Color::srgb(0.9, 0.3, 0.3)),
+            root.spawn((
+                ButtonBundle {
+                    style: Style {
+                        width: Val::Px(220.0),
+                        height: Val::Px(60.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
                         ..default()
                     },
-                    QuitButton,
-                ))
-                .with_children(|b| {
-                    b.spawn(TextBundle::from_section(
-                        "QUIT",
-                        TextStyle {
-                            font: Default::default(),
-                            font_size: 28.,
-                            color: Color::WHITE,
-                        },
-                    ));
-                });
+                    background_color: BackgroundColor(Color::srgb(0.9, 0.3, 0.3)),
+                    ..default()
+                },
+                QuitButton,
+            ))
+            .with_children(|b| {
+                b.spawn(TextBundle::from_section(
+                    "QUIT",
+                    TextStyle {
+                        font: Default::default(),
+                        font_size: 28.,
+                        color: Color::WHITE,
+                    },
+                ));
+            });
         });
 }
 
@@ -1157,53 +1124,51 @@ fn map_expand_system(
                         });
 
                         // Big 3x3 grid
-                        root
-                            .spawn(NodeBundle {
-                                style: Style {
-                                    width: Val::Px(300.0),
-                                    height: Val::Px(300.0),
-                                    flex_direction: FlexDirection::Column,
-                                    ..default()
-                                },
-                                background_color: BackgroundColor(Color::srgb(0.02, 0.05, 0.12)),
+                        root.spawn(NodeBundle {
+                            style: Style {
+                                width: Val::Px(300.0),
+                                height: Val::Px(300.0),
+                                flex_direction: FlexDirection::Column,
                                 ..default()
-                            })
-                            .with_children(|grid| {
-                                for y in 0..3 {
-                                    grid.spawn(NodeBundle {
-                                        style: Style {
-                                            width: Val::Percent(100.0),
-                                            height: Val::Percent(33.33),
-                                            flex_direction: FlexDirection::Row,
-                                            ..default()
-                                        },
-                                        background_color: BackgroundColor(Color::NONE),
+                            },
+                            background_color: BackgroundColor(Color::srgb(0.02, 0.05, 0.12)),
+                            ..default()
+                        })
+                        .with_children(|grid| {
+                            for y in 0..3 {
+                                grid.spawn(NodeBundle {
+                                    style: Style {
+                                        width: Val::Percent(100.0),
+                                        height: Val::Percent(33.33),
+                                        flex_direction: FlexDirection::Row,
                                         ..default()
-                                    })
-                                    .with_children(move |row_node| {
-                                        for x in 0..3 {
-                                            row_node
-                                                .spawn((
-                                                    ButtonBundle {
-                                                        style: Style {
-                                                            width: Val::Percent(33.33),
-                                                            height: Val::Percent(100.0),
-                                                            margin: UiRect::all(Val::Px(2.0)),
-                                                            border: UiRect::all(Val::Px(3.0)),
-                                                            ..default()
-                                                        },
-                                                        background_color: BackgroundColor(
-                                                            Color::srgb(0.0, 0.4, 0.7),
-                                                        ), // updated by system
-                                                        border_color: BorderColor(Color::BLACK),
-                                                        ..default()
-                                                    },
-                                                    MapOverlayCell { x, y },
-                                                ));
-                                        }
-                                    });
-                                }
-                            });
+                                    },
+                                    background_color: BackgroundColor(Color::NONE),
+                                    ..default()
+                                })
+                                .with_children(move |row_node| {
+                                    for x in 0..3 {
+                                        row_node.spawn((
+                                            ButtonBundle {
+                                                style: Style {
+                                                    width: Val::Percent(33.33),
+                                                    height: Val::Percent(100.0),
+                                                    margin: UiRect::all(Val::Px(2.0)),
+                                                    border: UiRect::all(Val::Px(3.0)),
+                                                    ..default()
+                                                },
+                                                background_color: BackgroundColor(Color::srgb(
+                                                    0.0, 0.4, 0.7,
+                                                )), // updated by system
+                                                border_color: BorderColor(Color::BLACK),
+                                                ..default()
+                                            },
+                                            MapOverlayCell { x, y },
+                                        ));
+                                    }
+                                });
+                            }
+                        });
                     });
             }
         }
@@ -1274,10 +1239,10 @@ mod tests {
     #[test]
     fn test_clamp_stats() {
         let mut stats = ReefStats {
-            coral: 150,     // too high
-            algae: -20,     // too low
-            ph: 20.0,       // too high
-            temp: -5.0,     // too low
+            coral: 150, // too high
+            algae: -20, // too low
+            ph: 20.0,   // too high
+            temp: -5.0, // too low
         };
 
         clamp_stats(&mut stats);
