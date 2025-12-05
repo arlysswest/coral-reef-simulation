@@ -101,6 +101,12 @@ struct ReefView;
 struct CoralSprite;
 
 #[derive(Component)]
+struct Coral {
+    x: f32,
+    y: f32,
+}
+
+#[derive(Component)]
 struct ToolButton {
     kind: ToolKind,
 }
@@ -945,10 +951,11 @@ fn sync_active_cell(stats: &ReefStats, map_state: &mut MapState) {
 // ─────────────────────────────────────────────
 //            UPDATE CORAL DISPLAY
 // ─────────────────────────────────────────────
+
 fn update_coral_display(
     stats: Res<ReefStats>,
     reef_query: Query<Entity, With<ReefView>>,
-    coral_query: Query<Entity, With<CoralSprite>>,
+    mut coral_query: Query<(Entity, &Coral, &mut Style)>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
@@ -956,42 +963,69 @@ fn update_coral_display(
         return;
     }
 
-    // Remove old corals
-    for coral in coral_query.iter() {
-        commands.entity(coral).despawn_recursive();
+    let target = stats.coral.clamp(0, 100) as usize;
+
+    let reef = reef_query.single();
+
+    // Extract existing coral data (entity, x, y)
+    let current: Vec<(Entity, f32, f32)> = coral_query
+        .iter_mut()
+        .map(|(e, coral, _style)| (e, coral.x, coral.y))
+        .collect();
+
+    let current_count = current.len();
+
+    // -------------------------------
+    // CASE 1: Need to REMOVE corals
+    // -------------------------------
+    if current_count > target {
+        let to_remove = current_count - target;
+        for (entity, _, _) in current.into_iter().take(to_remove) {
+            commands.entity(entity).despawn_recursive();
+        }
+        return;
     }
 
-    // Number of healthy corals = coral cover %
-    let healthy = stats.coral.clamp(0, 100);
-    let texture = asset_server.load("coral-transparent.png");
+    // -------------------------------
+    // CASE 2: Need to ADD corals
+    // -------------------------------
+    if current_count < target {
+        let to_add = target - current_count;
+        let texture = asset_server.load("coral-transparent.png");
+        let mut rng = rand::thread_rng();
 
-    let reef_entity = reef_query.single();
-    let mut rng = rand::thread_rng();
+        commands.entity(reef).with_children(|reef| {
+            for _ in 0..to_add {
+                let x = rng.gen_range(0.0..92.0);
+                let y = rng.gen_range(0.0..92.0);
 
-    commands.entity(reef_entity).with_children(|reef| {
-        for _ in 0..healthy {
-            let left = rng.gen_range(0.0..92.0);
-            let bottom = rng.gen_range(0.0..92.0);
-
-            reef.spawn((
-                ImageBundle {
-                    style: Style {
-                        width: Val::Px(38.0),
-                        height: Val::Px(38.0),
-                        position_type: PositionType::Absolute,
-                        left: Val::Percent(left),
-                        bottom: Val::Percent(bottom),
+                reef.spawn((
+                    ImageBundle {
+                        style: Style {
+                            width: Val::Px(38.0),
+                            height: Val::Px(38.0),
+                            position_type: PositionType::Absolute,
+                            left: Val::Percent(x),
+                            bottom: Val::Percent(y),
+                            ..default()
+                        },
+                        image: UiImage::new(texture.clone()),
+                        background_color: BackgroundColor(Color::NONE),
                         ..default()
                     },
-                    image: UiImage::new(texture.clone()),
-                    // Let the sprite's transparency show through
-                    background_color: BackgroundColor(Color::NONE),
-                    ..default()
-                },
-                CoralSprite,
-            ));
-        }
-    });
+                    Coral { x, y },
+                ));
+            }
+        });
+    }
+
+    // -------------------------------
+    // CORALS STAY IN SAME POSITIONS
+    // -------------------------------
+    for (_, coral, mut style) in coral_query.iter_mut() {
+        style.left = Val::Percent(coral.x);
+        style.bottom = Val::Percent(coral.y);
+    }
 }
 
 // ─────────────────────────────────────────────
