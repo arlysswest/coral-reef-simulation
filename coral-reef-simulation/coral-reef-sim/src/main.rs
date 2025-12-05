@@ -1,23 +1,12 @@
-//CHANGES TO ADD
+//WHAT TO WORK ON TO FINSIH THE PROJECT !!
+// 3. cargo clippy / rustfmt errors 
+// 4. fix repo file organization issue 
+//5. add tests
 
-// FINSIHED !!
-// 1. Added map feature!
-// 2. Completed readme ??
-
-// WORK ON RIGHT NOW
-// 1. coral reef display adjustments!!
-// - with each action I dont want the entire coral display to change. 
-// - right now after each action the location of the corals is completely random -> i dont want this
-// - if the coral cover increases:
-// - i want the ones that were previusly there to stay in thier current location
-// - ones that are added can be placed randomly
-// - if the coral cover decreases:
-// - i want the remaining coral to stay in its previous location
-// - only the randomly chosen coral to be removed will change
-
-// WORK ON LATER (ignore for now)!!
-// 1. get rid of warnings !!
-// 2. works on different size display screens !
+// NOTE:
+//" WARN bevy_winit::state: Skipped event Destroyed for unknown winit Window Id WindowId(140343576157488)"
+// -> issue with macos / bevy and can only  be stopped by muting the warning. 
+// -> It does not mean anything is wrong and does not need to be fixed.
 
 use bevy::prelude::*;
 use rand::Rng;
@@ -98,9 +87,6 @@ struct MessageText;
 struct ReefView;
 
 #[derive(Component)]
-struct CoralSprite;
-
-#[derive(Component)]
 struct Coral {
     x: f32,
     y: f32,
@@ -119,6 +105,9 @@ struct StartButton;
 
 #[derive(Component)]
 struct RestartButton;
+
+#[derive(Component)]
+struct StartScreenRoot;
 
 // Map-related components
 #[derive(Component)]
@@ -210,22 +199,27 @@ fn main() {
 // ─────────────────────────────────────────────
 //             START SCREEN SETUP
 // ─────────────────────────────────────────────
+
 fn setup_start_screen(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
+    // Tag root node with StartScreenRoot
     commands
-        .spawn(NodeBundle {
-            style: Style {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                flex_direction: FlexDirection::Column,
+        .spawn((
+            NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    flex_direction: FlexDirection::Column,
+                    ..default()
+                },
+                background_color: BackgroundColor(Color::srgb(0.0, 0.4, 0.7)),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgb(0.0, 0.4, 0.7)),
-            ..default()
-        })
+            StartScreenRoot,
+        ))
         .with_children(|root| {
             root.spawn(TextBundle::from_section(
                 "Help restore the coral reef!",
@@ -271,11 +265,11 @@ fn start_button_system(
     mut interaction_q: Query<&Interaction, (Changed<Interaction>, With<StartButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
     mut commands: Commands,
-    root_nodes: Query<Entity, With<Node>>,
+    root_nodes: Query<Entity, With<StartScreenRoot>>,
 ) {
     for interaction in &mut interaction_q {
         if *interaction == Interaction::Pressed {
-            // Clear start screen UI
+            // Delete ONLY the start screen UI
             for entity in &root_nodes {
                 commands.entity(entity).despawn_recursive();
             }
@@ -318,7 +312,7 @@ fn setup_game_ui(
     timer.0.reset();
     timer.0.pause();
 
-    commands.spawn(Camera2dBundle::default());
+    // NOTE: no extra Camera2dBundle here – we reuse the start-screen camera
 
     // ROOT
     commands
@@ -951,7 +945,6 @@ fn sync_active_cell(stats: &ReefStats, map_state: &mut MapState) {
 // ─────────────────────────────────────────────
 //            UPDATE CORAL DISPLAY
 // ─────────────────────────────────────────────
-
 fn update_coral_display(
     stats: Res<ReefStats>,
     reef_query: Query<Entity, With<ReefView>>,
@@ -965,7 +958,9 @@ fn update_coral_display(
 
     let target = stats.coral.clamp(0, 100) as usize;
 
-    let reef = reef_query.single();
+    let Ok(reef) = reef_query.get_single() else {
+        return; // no reef exists right now → do nothing
+    };
 
     // Extract existing coral data (entity, x, y)
     let current: Vec<(Entity, f32, f32)> = coral_query
@@ -1262,5 +1257,82 @@ fn map_overlay_cell_system(
             stats.ph = new_stats.ph;
             stats.temp = new_stats.temp;
         }
+    }
+}
+
+// ─────────────────────────────────────────────
+//                 UNIT TESTS
+// ─────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -----------------------------------------
+    // TEST 1 — clamp_stats() keeps values in range
+    // -----------------------------------------
+    #[test]
+    fn test_clamp_stats() {
+        let mut stats = ReefStats {
+            coral: 150,     // too high
+            algae: -20,     // too low
+            ph: 20.0,       // too high
+            temp: -5.0,     // too low
+        };
+
+        clamp_stats(&mut stats);
+
+        assert_eq!(stats.coral, 100);
+        assert_eq!(stats.algae, 0);
+        assert_eq!(stats.ph, 14.0);
+        assert_eq!(stats.temp, 0.0);
+    }
+
+    // -----------------------------------------
+    // TEST 2 — sync_active_cell() writes ReefStats into MapState
+    // -----------------------------------------
+    #[test]
+    fn test_sync_active_cell() {
+        let mut map_state = MapState::new();
+        map_state.active_x = 1;
+        map_state.active_y = 2;
+
+        let stats = ReefStats {
+            coral: 55,
+            algae: 12,
+            ph: 8.3,
+            temp: 27.5,
+        };
+
+        sync_active_cell(&stats, &mut map_state);
+
+        let cell = map_state.cells[2][1];
+        assert_eq!(cell.coral, 55);
+        assert_eq!(cell.algae, 12);
+        assert!((cell.ph - 8.3).abs() < 0.0001);
+        assert!((cell.temp - 27.5).abs() < 0.0001);
+    }
+
+    // -----------------------------------------
+    // TEST 3 — color_for_cell() returns correct colors
+    // -----------------------------------------
+    #[test]
+    fn test_color_for_cell() {
+        let mut map = MapState::new();
+
+        // healthy cell
+        map.cells[0][0].coral = 75;
+        let c = color_for_cell(&map, 0, 0);
+        assert_eq!(c, Color::srgb(1.0, 0.45, 0.25)); // orange
+
+        // unhealthy cell
+        map.cells[1][1].coral = 10;
+        let c2 = color_for_cell(&map, 1, 1);
+        assert_eq!(c2, Color::WHITE);
+
+        // medium cell (default blue)
+        map.cells[2][2].coral = 40;
+        let c3 = color_for_cell(&map, 2, 2);
+        assert_eq!(c3, Color::srgb(0.0, 0.4, 0.7));
     }
 }
