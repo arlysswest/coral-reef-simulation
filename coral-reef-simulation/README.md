@@ -7,7 +7,11 @@ Date: 12/03/2025
 
 # ABOUT THE PROGRAM
 
-(fill me in)
+This project simulates the health of a coral reef ecosystem and models how restoration decisions and environmental stressors affect the reef over time. The core of the simulation revolves around four statistics: coral cover %, algae %, water pH, and temperature, which update dynamically as the user interacts with the system.
+
+Positive actions (restoration tools) improve the reef, while randomly occurring real-world problems (pollution, CO₂ emissions, invasive species, storms, and overfishing) reduce reef health. The goal is to keep the coral reef alive by making informed restoration choices while responding to environmental challenges.
+
+The simulation is implemented first as a text-based version, and optionally as a visual version using the Bevy game engine.
 
 ## PROGRAM DESIGN
 
@@ -15,11 +19,31 @@ the full program design is located in "project-plan.pdf"
 
 ### Texed-based Version
 
-(fill me in)
+The text-based version follows a clear turn-based loop. Each turn:
+
+1. Displays current reef statistics
+2. Asks the user to choose a restoration tool or quit
+3. Updates the reef based on the selected tool
+4. Shows a positive message
+5. Randomly applies a reef-damaging environmental problem
+6. Updates statistics again
+7. Repeats until the user quits or coral cover reaches 0%
+
+The text version serves as the minimum viable product (MVP) and forms the logical foundation for the visual version.
 
 ### Visual Version
 
-(fill me in)
+The visual version implements the same simulation logic but adds:
+
+1. A reef visualization that displays coral images based on coral cover %
+2. A 3×3 interactive map, where each region is a separate reef cell with its own health
+3. Clickable tools in a sidebar
+4. A message panel showing recent events
+5. Real-time stat updates
+6. A clean UI built with Bevy 0.14
+7. Transparent coral sprites generated via AI
+
+This version transforms the simulation from a command-line loop into a fully interactive visual experience.
 
 ## RUNNING THE PROGRAM
 
@@ -34,14 +58,20 @@ the full program design is located in "project-plan.pdf"
 ## BRANCHES
 
 1. main -> contains finsihed version or current best version
-2. visual-version -> contains current version of the visual version
-3. text-based -> contains the finished text based version
+2. visual-version -> contains current or finsihed version of the visual version
+3. text-based -> contains current best version of the program, either visual or text-based
 
 ### PROCESS
 
 ## What Worked
 
-(fill me in)
+I was able to fully implement the simulation logic for both the text-based and visual versions.
+Important successes:
+
+1. Bevy was effective for creating UI layouts, buttons, images, and real-time updates.
+2. Implementing coral visualization based on coral cover % worked well.
+3. Adding a 3×3 interactive map was successful and made the project more engaging.
+4. Structured state management (Start -> Game -> Game Over) kept the program organized.
 
 ## What didn't work
 
@@ -53,13 +83,20 @@ I needed to either use a .gitignore or only add specific files instead of a gene
 
 When I tried to push the first version of the visual version with the too large of files, i messed up my git history. I lost the version in the process and had to revert back to the working version I had on githb before that. This could have been avoided had I made a backup version.
 
-## What lessens were learned
+## What lessons were learned
 
-(fill me in)
+1. Always add a .gitignore early in the project—especially when using game engines like 2.2. Bevy that generate large build artifacts.
+2. Create backup branches before attempting major refactors or adding many assets.
+3. ECS programming encourages modularity, but you must carefully manage queries to avoid Bevy borrow conflicts.
+4. Rust’s borrow checker catches issues early, but understanding lifetimes and mutable references in ECS systems takes practice.
+5. Visual UI programming is iterative: start simple, then refine layout, colors, and features.
+6. Transparent PNG/AVIF assets must be tested in Bevy to confirm alpha channels load correctly.
 
 # What Could Be Added Or Improved
 
-(fill me in)
+1. The map function could be improved. As of right now the design is very basic and doesnt have any detail. The design could be improved to display a coral reef instead of the blue/orange/white squares.
+
+2. A more info option could be added to the visual version. I implemented a more info option to the text-based version that would give more info about the tools, problems, and staistics when selected to inform decisions. This could be added as its own button or as a hover option to the visual version.
 
 ### RESEARCH
 
@@ -85,7 +122,7 @@ used chatgpt to pick color codes:
 
 # AI generated Image of a coral
 
-I couldn't find an open source & free transparent image of a coral to use online. I could have created the code to draw the coral over and over, but I decided to not use that method. Instead I asked AI to generate an orange coral with a transparent background. This image is in the assets folder with the name "coral-transparent.png"
+I couldn't find an open source & free transparent image of a coral to use online. I could have created the code to draw the coral over and over, but I decided to not use that method. Instead I asked AI to "generate an image of an orange coral with a transparent background". This image is in the assets folder with the name "coral-transparent.png"
 
 ## Coral Reef Research
 
@@ -105,7 +142,7 @@ I couldn't find an open source & free transparent image of a coral to use online
 - Piston
 - Amethist
 
-# Choice : Bevy
+# Choice : Bevy pros & Cons
 
 - PROS:
 
@@ -124,3 +161,11 @@ I couldn't find an open source & free transparent image of a coral to use online
 * WASM quirks (not all crates supported).
 * You must optimize ECS queries yourself.
 * can be heavy and have a long loading time.
+
+# Bevy Syntax
+
+- From the Bevy website:
+  I learned the basics of UI nodes, layout styling, spawning and despawning entities, handling button interactions, and loading assets like images and fonts.
+
+- From ChatGPT:
+  I learned how to correctly use transparent images, fix ECS query conflicts with ParamSet, and troubleshoot Bevy errors.

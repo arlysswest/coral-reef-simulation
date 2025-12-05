@@ -1,23 +1,23 @@
 //CHANGES TO ADD
 
-//FINSIHED
-// coral reef display !!
+// FINSIHED !!
+// 1. Added map feature!
+// 2. Completed readme ??
 
-//ADD NEXT !!
-// 1. MAP FEATURE
-// 3x3 grid
-// click on map to expand
-// small close button in top left cprner when expanded
-// when map is expanded u can click on a different section to change locations
-// simulation will start in top left box
-//  - healthy reef = orange square
-// - unhealthy square = white square 
-// - typical reef (starting) = sea blue square
+// WORK ON RIGHT NOW
+// 1. coral reef display adjustments!!
+// - with each action I dont want the entire coral display to change. 
+// - right now after each action the location of the corals is completely random -> i dont want this
+// - if the coral cover increases:
+// - i want the ones that were previusly there to stay in thier current location
+// - ones that are added can be placed randomly
+// - if the coral cover decreases:
+// - i want the remaining coral to stay in its previous location
+// - only the randomly chosen coral to be removed will change
 
 // WORK ON LATER (ignore for now)!!
 // 1. get rid of warnings !!
 // 2. works on different size display screens !
-// 2. finsh README.md
 
 use bevy::prelude::*;
 use rand::Rng;
@@ -46,12 +46,43 @@ struct GameState {
     message: String,
 }
 
-#[derive(Resource)]
+#[derive(Resource, Clone, Copy)]
 struct ReefStats {
     coral: i32,
     algae: i32,
     ph: f32,
     temp: f32,
+}
+
+#[derive(Clone, Copy)]
+struct CellStats {
+    coral: i32,
+    algae: i32,
+    ph: f32,
+    temp: f32,
+}
+
+#[derive(Resource)]
+struct MapState {
+    cells: [[CellStats; 3]; 3],
+    active_x: usize,
+    active_y: usize,
+}
+
+impl MapState {
+    fn new() -> Self {
+        let base = CellStats {
+            coral: 35,
+            algae: 10,
+            ph: 8.1,
+            temp: 27.0,
+        };
+        Self {
+            cells: [[base; 3]; 3],
+            active_x: 0,
+            active_y: 0,
+        }
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -82,6 +113,28 @@ struct StartButton;
 
 #[derive(Component)]
 struct RestartButton;
+
+// Map-related components
+#[derive(Component)]
+struct MapMiniRoot;
+
+#[derive(Component)]
+struct MapMiniCell {
+    x: usize,
+    y: usize,
+}
+
+#[derive(Component)]
+struct MapOverlayRoot;
+
+#[derive(Component)]
+struct MapOverlayCell {
+    x: usize,
+    y: usize,
+}
+
+#[derive(Component)]
+struct MapCloseButton;
 
 #[derive(Clone, Copy)]
 enum ToolKind {
@@ -119,6 +172,7 @@ fn main() {
             ph: 8.1,
             temp: 27.0,
         })
+        .insert_resource(MapState::new())
         .add_systems(Startup, setup_start_screen)
         .add_systems(Update, start_button_system.run_if(in_state(AppState::StartMenu)))
         .add_systems(OnEnter(AppState::InGame), setup_game_ui)
@@ -130,6 +184,10 @@ fn main() {
                 problem_timer_system,
                 update_stats_ui_system,
                 update_coral_display,
+                map_expand_system,
+                map_close_system,
+                map_overlay_cell_system,
+                update_map_colors_system,
             )
                 .run_if(in_state(AppState::InGame)),
         )
@@ -226,15 +284,27 @@ fn start_button_system(
 fn setup_game_ui(
     mut commands: Commands,
     mut timer: ResMut<ProblemTimer>,
-    _asset_server: Res<AssetServer>,
     mut stats: ResMut<ReefStats>,
     mut state: ResMut<GameState>,
+    mut map_state: ResMut<MapState>,
 ) {
-    // Reset stats and state each time we enter InGame
-    stats.coral = 35;
-    stats.algae = 10;
-    stats.ph = 8.1;
-    stats.temp = 27.0;
+    // Reset map + stats each time we enter InGame
+    let base = CellStats {
+        coral: 35,
+        algae: 10,
+        ph: 8.1,
+        temp: 27.0,
+    };
+    map_state.cells = [[base; 3]; 3];
+    map_state.active_x = 0;
+    map_state.active_y = 0;
+
+    // Current cell stats
+    let active = map_state.cells[0][0];
+    stats.coral = active.coral;
+    stats.algae = active.algae;
+    stats.ph = active.ph;
+    stats.temp = active.temp;
 
     state.turn = 0;
     state.message = "Simulation Started! Use tools to restore the reef.".into();
@@ -350,8 +420,8 @@ fn setup_game_ui(
                                     style: Style {
                                         height: Val::Percent(25.0),
                                         padding: UiRect::all(Val::Px(10.0)),
-                                        justify_content: JustifyContent::Center,
-                                        align_items: AlignItems::Center,
+                                        flex_direction: FlexDirection::Column,
+                                        row_gap: Val::Px(6.0),
                                         ..default()
                                     },
                                     background_color: BackgroundColor(Color::srgb(
@@ -359,15 +429,81 @@ fn setup_game_ui(
                                     )),
                                     ..default()
                                 })
-                                .with_children(|map| {
-                                    map.spawn(TextBundle::from_section(
-                                        "Map (Future Feature)",
+                                .with_children(|map_box| {
+                                    map_box.spawn(TextBundle::from_section(
+                                        "Map (click to expand)",
                                         TextStyle {
                                             font: Default::default(),
                                             font_size: 18.0,
                                             color: Color::WHITE,
                                         },
                                     ));
+
+                                    // Mini map button (3x3)
+                                    map_box
+                                        .spawn((
+                                            ButtonBundle {
+                                                style: Style {
+                                                    width: Val::Percent(100.0),
+                                                    height: Val::Px(80.0),
+                                                    justify_content: JustifyContent::Center,
+                                                    align_items: AlignItems::Center,
+                                                    flex_direction: FlexDirection::Column,
+                                                    ..default()
+                                                },
+                                                background_color: BackgroundColor(
+                                                    Color::srgb(0.02, 0.08, 0.15),
+                                                ),
+                                                ..default()
+                                            },
+                                            MapMiniRoot,
+                                        ))
+                                        .with_children(|mini| {
+                                            for y in 0..3 {
+                                                mini.spawn(NodeBundle {
+                                                    style: Style {
+                                                        width: Val::Percent(100.0),
+                                                        height: Val::Percent(33.33),
+                                                        flex_direction: FlexDirection::Row,
+                                                        ..default()
+                                                    },
+                                                    background_color: BackgroundColor(
+                                                        Color::NONE,
+                                                    ),
+                                                    ..default()
+                                                })
+                                                .with_children(move |row_node| {
+                                                    for x in 0..3 {
+                                                        row_node.spawn((
+                                                            NodeBundle {
+                                                                style: Style {
+                                                                    width: Val::Percent(33.33),
+                                                                    height: Val::Percent(100.0),
+                                                                    margin: UiRect::all(
+                                                                        Val::Px(1.0),
+                                                                    ),
+                                                                    border: UiRect::all(
+                                                                        Val::Px(3.0),
+                                                                    ),
+                                                                    ..default()
+                                                                },
+                                                                background_color:
+                                                                    BackgroundColor(
+                                                                        Color::srgb(
+                                                                            0.0, 0.4, 0.7,
+                                                                        ),
+                                                                    ), // will be updated
+                                                                border_color: BorderColor(
+                                                                    Color::BLACK,
+                                                                ),
+                                                                ..default()
+                                                            },
+                                                            MapMiniCell { x, y },
+                                                        ));
+                                                    }
+                                                });
+                                            }
+                                        });
                                 });
 
                             // MESSAGES
@@ -665,11 +801,12 @@ fn tool_button_system(
     mut stats: ResMut<ReefStats>,
     mut state: ResMut<GameState>,
     mut timer: ResMut<ProblemTimer>,
+    mut map_state: ResMut<MapState>,
 ) {
     for (interaction, mut color, tool) in &mut interaction_q {
         match *interaction {
             Interaction::Pressed => {
-                apply_tool(tool.kind, &mut stats, &mut state);
+                apply_tool(tool.kind, &mut stats, &mut state, &mut map_state);
 
                 // After using a tool, schedule exactly one new problem
                 timer.0.reset();
@@ -687,7 +824,12 @@ fn tool_button_system(
     }
 }
 
-fn apply_tool(kind: ToolKind, stats: &mut ReefStats, state: &mut GameState) {
+fn apply_tool(
+    kind: ToolKind,
+    stats: &mut ReefStats,
+    state: &mut GameState,
+    map_state: &mut MapState,
+) {
     state.message = match kind {
         ToolKind::ArtificialSubstrates => {
             stats.coral += 5;
@@ -713,6 +855,7 @@ fn apply_tool(kind: ToolKind, stats: &mut ReefStats, state: &mut GameState) {
     .into();
 
     clamp_stats(stats);
+    sync_active_cell(stats, map_state);
 }
 
 // ─────────────────────────────────────────────
@@ -724,6 +867,7 @@ fn problem_timer_system(
     mut stats: ResMut<ReefStats>,
     mut state: ResMut<GameState>,
     mut next_state: ResMut<NextState<AppState>>,
+    mut map_state: ResMut<MapState>,
 ) {
     if timer.0.tick(time.delta()).just_finished() {
         let mut rng = rand::thread_rng();
@@ -765,6 +909,9 @@ fn problem_timer_system(
         clamp_stats(&mut stats);
         state.turn += 1;
 
+        // Sync map cell with new stats
+        sync_active_cell(&stats, &mut map_state);
+
         // Stop this cycle (we only want one problem per timer run)
         timer.0.pause();
 
@@ -778,13 +925,21 @@ fn problem_timer_system(
 }
 
 // ─────────────────────────────────────────────
-//              CLAMP STATS LOGIC
+//              CLAMP & SYNC LOGIC
 // ─────────────────────────────────────────────
 fn clamp_stats(stats: &mut ReefStats) {
     stats.coral = stats.coral.clamp(0, 100);
     stats.algae = stats.algae.clamp(0, 100);
     stats.ph = stats.ph.clamp(0.0, 14.0);
     stats.temp = stats.temp.clamp(0.0, 40.0);
+}
+
+fn sync_active_cell(stats: &ReefStats, map_state: &mut MapState) {
+    let cell = &mut map_state.cells[map_state.active_y][map_state.active_x];
+    cell.coral = stats.coral;
+    cell.algae = stats.algae;
+    cell.ph = stats.ph;
+    cell.temp = stats.temp;
 }
 
 // ─────────────────────────────────────────────
@@ -859,5 +1014,219 @@ fn update_stats_ui_system(
 
     if let Ok(mut msg) = sets.p1().get_single_mut() {
         msg.sections[0].value = state.message.clone();
+    }
+}
+
+// ─────────────────────────────────────────────
+//                MAP COLOR HELPER
+// ─────────────────────────────────────────────
+fn color_for_cell(map: &MapState, x: usize, y: usize) -> Color {
+    let stats = map.cells[y][x];
+    if stats.coral >= 60 {
+        // healthy = orange
+        Color::srgb(1.0, 0.45, 0.25)
+    } else if stats.coral <= 20 {
+        // unhealthy = white
+        Color::WHITE
+    } else {
+        // typical = sea blue
+        Color::srgb(0.0, 0.4, 0.7)
+    }
+}
+
+// ─────────────────────────────────────────────
+//             UPDATE MAP COLORS
+// ─────────────────────────────────────────────
+fn update_map_colors_system(
+    map_state: Res<MapState>,
+    mut sets: ParamSet<(
+        Query<(&MapMiniCell, &mut BackgroundColor)>,
+        Query<(&MapOverlayCell, &mut BackgroundColor)>,
+    )>,
+) {
+    // Mini-map colors
+    for (cell, mut color) in sets.p0().iter_mut() {
+        *color = BackgroundColor(color_for_cell(&map_state, cell.x, cell.y));
+    }
+
+    // Overlay colors
+    for (cell, mut color) in sets.p1().iter_mut() {
+        *color = BackgroundColor(color_for_cell(&map_state, cell.x, cell.y));
+    }
+}
+
+// ─────────────────────────────────────────────
+//             MAP EXPAND / CLOSE / CLICK
+// ─────────────────────────────────────────────
+fn map_expand_system(
+    mut interaction_q: Query<&Interaction, (Changed<Interaction>, With<MapMiniRoot>)>,
+    overlay_q: Query<Entity, With<MapOverlayRoot>>,
+    mut commands: Commands,
+) {
+    for interaction in &mut interaction_q {
+        if *interaction == Interaction::Pressed {
+            // Only spawn if there isn't already an overlay
+            if overlay_q.is_empty() {
+                commands
+                    .spawn((
+                        NodeBundle {
+                            style: Style {
+                                width: Val::Percent(100.0),
+                                height: Val::Percent(100.0),
+                                position_type: PositionType::Absolute,
+                                left: Val::Px(0.0),
+                                top: Val::Px(0.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
+                            ..default()
+                        },
+                        MapOverlayRoot,
+                    ))
+                    .with_children(|root| {
+                        // Close button in top-left
+                        root.spawn(NodeBundle {
+                            style: Style {
+                                position_type: PositionType::Absolute,
+                                left: Val::Px(10.0),
+                                top: Val::Px(10.0),
+                                ..default()
+                            },
+                            background_color: BackgroundColor(Color::NONE),
+                            ..default()
+                        })
+                        .with_children(|close_container| {
+                            close_container
+                                .spawn((
+                                    ButtonBundle {
+                                        style: Style {
+                                            width: Val::Px(32.0),
+                                            height: Val::Px(32.0),
+                                            justify_content: JustifyContent::Center,
+                                            align_items: AlignItems::Center,
+                                            ..default()
+                                        },
+                                        background_color: BackgroundColor(Color::srgb(
+                                            0.9, 0.3, 0.3,
+                                        )),
+                                        ..default()
+                                    },
+                                    MapCloseButton,
+                                ))
+                                .with_children(|b| {
+                                    b.spawn(TextBundle::from_section(
+                                        "X",
+                                        TextStyle {
+                                            font: Default::default(),
+                                            font_size: 20.0,
+                                            color: Color::WHITE,
+                                        },
+                                    ));
+                                });
+                        });
+
+                        // Big 3x3 grid
+                        root
+                            .spawn(NodeBundle {
+                                style: Style {
+                                    width: Val::Px(300.0),
+                                    height: Val::Px(300.0),
+                                    flex_direction: FlexDirection::Column,
+                                    ..default()
+                                },
+                                background_color: BackgroundColor(Color::srgb(0.02, 0.05, 0.12)),
+                                ..default()
+                            })
+                            .with_children(|grid| {
+                                for y in 0..3 {
+                                    grid.spawn(NodeBundle {
+                                        style: Style {
+                                            width: Val::Percent(100.0),
+                                            height: Val::Percent(33.33),
+                                            flex_direction: FlexDirection::Row,
+                                            ..default()
+                                        },
+                                        background_color: BackgroundColor(Color::NONE),
+                                        ..default()
+                                    })
+                                    .with_children(move |row_node| {
+                                        for x in 0..3 {
+                                            row_node
+                                                .spawn((
+                                                    ButtonBundle {
+                                                        style: Style {
+                                                            width: Val::Percent(33.33),
+                                                            height: Val::Percent(100.0),
+                                                            margin: UiRect::all(Val::Px(2.0)),
+                                                            border: UiRect::all(Val::Px(3.0)),
+                                                            ..default()
+                                                        },
+                                                        background_color: BackgroundColor(
+                                                            Color::srgb(0.0, 0.4, 0.7),
+                                                        ), // updated by system
+                                                        border_color: BorderColor(Color::BLACK),
+                                                        ..default()
+                                                    },
+                                                    MapOverlayCell { x, y },
+                                                ));
+                                        }
+                                    });
+                                }
+                            });
+                    });
+            }
+        }
+    }
+}
+
+fn map_close_system(
+    mut interaction_q: Query<&Interaction, (Changed<Interaction>, With<MapCloseButton>)>,
+    overlay_q: Query<Entity, With<MapOverlayRoot>>,
+    mut commands: Commands,
+) {
+    for interaction in &mut interaction_q {
+        if *interaction == Interaction::Pressed {
+            for e in &overlay_q {
+                commands.entity(e).despawn_recursive();
+            }
+        }
+    }
+}
+
+fn map_overlay_cell_system(
+    mut interaction_q: Query<(&Interaction, &MapOverlayCell), Changed<Interaction>>,
+    mut map_state: ResMut<MapState>,
+    mut stats: ResMut<ReefStats>,
+) {
+    for (interaction, cell) in &mut interaction_q {
+        if *interaction == Interaction::Pressed {
+            // Store old indices first
+            let old_x = map_state.active_x;
+            let old_y = map_state.active_y;
+
+            // Save current stats into old active cell (scoped borrow)
+            {
+                let old_cell = &mut map_state.cells[old_y][old_x];
+                old_cell.coral = stats.coral;
+                old_cell.algae = stats.algae;
+                old_cell.ph = stats.ph;
+                old_cell.temp = stats.temp;
+            }
+
+            // Switch active cell
+            map_state.active_x = cell.x;
+            map_state.active_y = cell.y;
+
+            // Load new cell stats into ReefStats
+            let new_x = map_state.active_x;
+            let new_y = map_state.active_y;
+            let new_stats = map_state.cells[new_y][new_x];
+            stats.coral = new_stats.coral;
+            stats.algae = new_stats.algae;
+            stats.ph = new_stats.ph;
+            stats.temp = new_stats.temp;
+        }
     }
 }
