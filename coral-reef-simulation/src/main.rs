@@ -1,5 +1,4 @@
-//WHAT TO WORK ON TO FINSIH THE PROJECT !!
-// 2. fix repo file organization issue
+// FINISHED PROGRAM !!!
 
 // NOTE:
 //" WARN bevy_winit::state: Skipped event Destroyed for unknown winit Window Id WindowId(140343576157488)"
