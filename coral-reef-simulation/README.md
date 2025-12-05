@@ -1,25 +1,33 @@
-### AUTHORSHIP INFORMATION
+# AUTHORSHIP INFORMATION
 
 Name: Arlyss West
 Class: CS-423 Rust Programming
 Licence: MIT + Apache 2.0
 Date: 12/03/2025
 
-### ABOUT THE PROGRAM
+# ABOUT THE PROGRAM
 
 (fill me in)
 
 ## PROGRAM DESIGN
 
-the fill program design is located in "project-plan.pdf"
+the full program design is located in "project-plan.pdf"
+
+### Texed-based Version
+
+(fill me in)
+
+### Visual Version
+
+(fill me in)
 
 ## RUNNING THE PROGRAM
 
-# RUN THE PROGRAM:
+### RUN THE PROGRAM:
 
     cargo run
 
-# BEVY VERSION
+### BEVY VERSION
 
     bevy 0.14
 
@@ -57,6 +65,12 @@ When I tried to push the first version of the visual version with the too large 
 
 ## What lessens were learned
 
+(fill me in)
+
+# What Could Be Added Or Improved
+
+(fill me in)
+
 ### RESEARCH
 
 ## Research tools
@@ -68,6 +82,16 @@ When I tried to push the first version of the visual version with the too large 
 
 - copy and pasted errors into chatgpt to better understand what the errors mean when I am unfamiliar with an error
 - git revision control syntax for merging to resolve merge issues
+
+## Simulation Design
+
+# Color Codes
+
+used chatgpt to pick color codes:
+
+- "color code for sea blue?"
+- "color code for coral orange?"
+- "What colors would look good in combination with my current colors?"
 
 ## Coral Reef Research
 

@@ -1,11 +1,17 @@
 //CHANGES TO ADD
+
+// FINSIHED !!
 // 1. Game over = coral cover = 0%
-// redirects to 2 options: either quit or restart
-// 2. problems should only occur once after each tool is applied and once at the beggining
-// 3. work on improving coral reef display
-// 4. add map feature
-// 5. get rid of warnings !!
-// 5. finsh README.md
+// redirects to 2 options: either quit or restart -> done
+// 2. problems should only occur once after each tool is applied and once at the beggining -> done
+
+//NEEDS IMROVEMENT:
+// 3. work on improving coral reef display - right now its just color blocks I wnat it to display actual corals 
+
+//WHAT TO FOCUS ON LATER:
+// 1. add map feature
+// 2. get rid of warnings !!
+// 3. finsh README.md
 
 use bevy::prelude::*;
 use rand::Rng;
@@ -19,6 +25,7 @@ enum AppState {
     #[default]
     StartMenu,
     InGame,
+    GameOver,
 }
 
 // ─────────────────────────────────────────────
@@ -67,6 +74,9 @@ struct QuitButton;
 #[derive(Component)]
 struct StartButton;
 
+#[derive(Component)]
+struct RestartButton;
+
 #[derive(Clone, Copy)]
 enum ToolKind {
     ArtificialSubstrates,
@@ -91,7 +101,7 @@ fn main() {
         .insert_state(AppState::StartMenu)
         .insert_resource(ProblemTimer(Timer::new(
             Duration::from_secs(3),
-            TimerMode::Repeating,
+            TimerMode::Once, // fire once per cycle (start or tool use)
         )))
         .insert_resource(GameState {
             turn: 0,
@@ -106,16 +116,23 @@ fn main() {
         .add_systems(Startup, setup_start_screen)
         .add_systems(Update, start_button_system.run_if(in_state(AppState::StartMenu)))
         .add_systems(OnEnter(AppState::InGame), setup_game_ui)
+        .add_systems(OnEnter(AppState::GameOver), setup_game_over)
         .add_systems(
             Update,
             (
-                quit_button_system,
                 tool_button_system,
                 problem_timer_system,
                 update_stats_ui_system,
                 update_coral_display,
             )
                 .run_if(in_state(AppState::InGame)),
+        )
+        // Quit works in any state that has a QuitButton
+        .add_systems(Update, quit_button_system)
+        // Restart only on GameOver screen
+        .add_systems(
+            Update,
+            restart_button_system.run_if(in_state(AppState::GameOver)),
         )
         .run();
 }
@@ -188,6 +205,7 @@ fn start_button_system(
 ) {
     for interaction in &mut interaction_q {
         if *interaction == Interaction::Pressed {
+            // Clear start screen UI
             for entity in &root_nodes {
                 commands.entity(entity).despawn_recursive();
             }
@@ -202,8 +220,19 @@ fn start_button_system(
 fn setup_game_ui(
     mut commands: Commands,
     mut timer: ResMut<ProblemTimer>,
-    asset_server: Res<AssetServer>,
+    _asset_server: Res<AssetServer>,
+    mut stats: ResMut<ReefStats>,
+    mut state: ResMut<GameState>,
 ) {
+    // Reset stats and state each time we enter InGame
+    stats.coral = 35;
+    stats.algae = 10;
+    stats.ph = 8.1;
+    stats.temp = 27.0;
+
+    state.turn = 0;
+    state.message = "Simulation Started! Use tools to restore the reef.".into();
+
     timer.0.reset();
     timer.0.pause();
 
@@ -465,8 +494,8 @@ fn setup_game_ui(
                 background_color: BackgroundColor(Color::srgb(0.02, 0.05, 0.12)),
                 ..default()
             })
-            .with_children(|stats| {
-                stats.spawn((
+            .with_children(|stats_node| {
+                stats_node.spawn((
                     TextBundle::from_section(
                         "Water pH: 0 | Temp: 0 | Coral: 0 | Algae: 0 | Turn 0",
                         TextStyle {
@@ -480,7 +509,117 @@ fn setup_game_ui(
             });
         });
 
+    // Start the first "beginning" problem cycle
     timer.0.unpause();
+}
+
+// ─────────────────────────────────────────────
+//             GAME OVER SCREEN SETUP
+// ─────────────────────────────────────────────
+fn setup_game_over(mut commands: Commands, nodes: Query<Entity, With<Node>>) {
+    // Clear any existing UI nodes
+    for entity in &nodes {
+        commands.entity(entity).despawn_recursive();
+    }
+
+    // Reuse cameras that already exist; just spawn new UI
+    commands
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            background_color: BackgroundColor(Color::srgb(0.05, 0.0, 0.1)),
+            ..default()
+        })
+        .with_children(|root| {
+            root.spawn(TextBundle::from_section(
+                "GAME OVER\nThe reef has collapsed.",
+                TextStyle {
+                    font: Default::default(),
+                    font_size: 40.0,
+                    color: Color::WHITE,
+                },
+            ));
+
+            root
+                .spawn((
+                    ButtonBundle {
+                        style: Style {
+                            width: Val::Px(220.0),
+                            height: Val::Px(60.0),
+                            margin: UiRect::all(Val::Px(20.0)),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        background_color: BackgroundColor(Color::srgb(0.3, 0.9, 0.4)),
+                        ..default()
+                    },
+                    RestartButton,
+                ))
+                .with_children(|b| {
+                    b.spawn(TextBundle::from_section(
+                        "RESTART",
+                        TextStyle {
+                            font: Default::default(),
+                            font_size: 28.,
+                            color: Color::BLACK,
+                        },
+                    ));
+                });
+
+            root
+                .spawn((
+                    ButtonBundle {
+                        style: Style {
+                            width: Val::Px(220.0),
+                            height: Val::Px(60.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        background_color: BackgroundColor(Color::srgb(0.9, 0.3, 0.3)),
+                        ..default()
+                    },
+                    QuitButton,
+                ))
+                .with_children(|b| {
+                    b.spawn(TextBundle::from_section(
+                        "QUIT",
+                        TextStyle {
+                            font: Default::default(),
+                            font_size: 28.,
+                            color: Color::WHITE,
+                        },
+                    ));
+                });
+        });
+}
+
+// ─────────────────────────────────────────────
+//             RESTART BUTTON LOGIC
+// ─────────────────────────────────────────────
+fn restart_button_system(
+    mut interaction_q: Query<&Interaction, (Changed<Interaction>, With<RestartButton>)>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut commands: Commands,
+    nodes: Query<Entity, With<Node>>,
+) {
+    for interaction in &mut interaction_q {
+        if *interaction == Interaction::Pressed {
+            // Clear Game Over UI
+            for entity in &nodes {
+                commands.entity(entity).despawn_recursive();
+            }
+            // Go back to InGame, which will reset stats and UI
+            next_state.set(AppState::InGame);
+        }
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -526,6 +665,7 @@ fn tool_button_system(
             Interaction::Pressed => {
                 apply_tool(tool.kind, &mut stats, &mut state);
 
+                // After using a tool, schedule exactly one new problem
                 timer.0.reset();
                 timer.0.unpause();
 
@@ -577,6 +717,7 @@ fn problem_timer_system(
     mut timer: ResMut<ProblemTimer>,
     mut stats: ResMut<ReefStats>,
     mut state: ResMut<GameState>,
+    mut next_state: ResMut<NextState<AppState>>,
 ) {
     if timer.0.tick(time.delta()).just_finished() {
         let mut rng = rand::thread_rng();
@@ -617,6 +758,16 @@ fn problem_timer_system(
 
         clamp_stats(&mut stats);
         state.turn += 1;
+
+        // Stop this cycle (we only want one problem per timer run)
+        timer.0.pause();
+
+        // Check for game over (coral = 0%)
+        if stats.coral <= 0 {
+            stats.coral = 0;
+            state.message = " The reef has collapsed. Game over.".into();
+            next_state.set(AppState::GameOver);
+        }
     }
 }
 
@@ -649,9 +800,9 @@ fn update_coral_display(
         commands.entity(coral).despawn_recursive();
     }
 
-    // Spawn new healthy corals
+    // Number of healthy corals = coral cover %
     let healthy = stats.coral.clamp(0, 100);
-    let texture = asset_server.load("coral-transparent.avif");
+    let texture = asset_server.load("coral-transparent.png");
 
     let reef_entity = reef_query.single();
     let mut rng = rand::thread_rng();
@@ -664,15 +815,16 @@ fn update_coral_display(
             reef.spawn((
                 ImageBundle {
                     style: Style {
-                        width: Val::Px(32.0),
-                        height: Val::Px(32.0),
+                        width: Val::Px(38.0),
+                        height: Val::Px(38.0),
                         position_type: PositionType::Absolute,
                         left: Val::Percent(left),
                         bottom: Val::Percent(bottom),
                         ..default()
                     },
                     image: UiImage::new(texture.clone()),
-                    background_color: BackgroundColor(Color::srgb(1.0, 0.45, 0.25)),
+                    // Let the sprite's transparency show through
+                    background_color: BackgroundColor(Color::NONE),
                     ..default()
                 },
                 CoralSprite,
